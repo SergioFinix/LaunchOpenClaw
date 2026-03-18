@@ -1,0 +1,68 @@
+version: "3.8"
+
+services:
+  openclaw-agent:
+    image: ghcr.io/openclaw/openclaw:latest
+    container_name: openclaw-agent-${USER_ID}
+    # Ejecutamos como el usuario 1000 para mayor seguridad (No Root)
+    user: "1000:1000"
+    ports:
+      # Mapeo del puerto de la máquina (generado por la API) al 18789 del contenedor
+      - "${HOST_PORT}:18789"
+    volumes:
+      # Corregido: la imagen de OpenClaw usa /home/node, no /home/openclaw
+      - ./data/agents/${USER_ID}/.openclaw:/home/node/.openclaw
+      - ./workspace/${USER_ID}:/workspace
+    environment:
+      - NODE_ENV=production
+      - NODE_OPTIONS=--max-old-space-size=4096
+      # Inyectar variables para el parche de seguridad de Origen
+      - USER_ID=${USER_ID}
+      - HOST_PORT=${HOST_PORT}
+      # Tu API inyectará esta variable automáticamente si está configurada en .env
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - TZ=America/Mexico_City
+      - TERM=xterm-256color
+      - BROWSER=echo # Desactiva el auto-open de pestañas de navegador dentro del contenedor
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 3000M
+    command: >
+      sh -c "
+        CONFIG_DIR=/home/node/.openclaw
+        
+        if [ -z \"$$(ls -A $${CONFIG_DIR})\" ]; then
+          echo '=> First time setup: running OpenClaw onboard in non-interactive mode...'
+          node dist/index.js onboard --non-interactive --mode local --auth-choice openai-api-key --openai-api-key \"$${OPENAI_API_KEY}\" --gateway-port 18789 --gateway-bind lan --accept-risk --skip-health
+        else
+          echo '=> Config exists, skipping onboard...'
+        fi &&
+        
+        echo '=> Patching host header origins security for dynamic Docker ports...' &&
+        node -e \"
+          const fs = require('fs');
+          const cfg = '$${CONFIG_DIR}/openclaw.json';
+          if(fs.existsSync(cfg)) {
+            let data = JSON.parse(fs.readFileSync(cfg, 'utf8'));
+            data.gateway = data.gateway || {};
+            data.gateway.controlUi = data.gateway.controlUi || {};
+            data.gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback = true;
+            // Forzar los orígenes de mi puerto dinámico real
+            const myPort = process.env.HOST_PORT;
+            data.gateway.controlUi.allowedOrigins = [
+              ...new Set([
+                ...(data.gateway.controlUi.allowedOrigins || []),
+                'http://localhost:' + myPort,
+                'http://127.0.0.1:' + myPort
+              ])
+            ];
+            fs.writeFileSync(cfg, JSON.stringify(data, null, 2));
+          }
+        \" &&
+        
+        echo '=> Starting OpenClaw gateway...' &&
+        node dist/index.js gateway
+      "
