@@ -32,7 +32,7 @@ const getFreePort = (startPort: number): Promise<number> => {
 };
 
 app.post('/api/agents', async (req: Request, res: Response): Promise<any> => {
-    const { userId } = req.body;
+    const { userId, telegramToken } = req.body;
 
     // 1. Validar inputs
     if (typeof userId !== 'string' || !/^[a-zA-Z0-9]+$/.test(userId)) {
@@ -55,11 +55,16 @@ app.post('/api/agents', async (req: Request, res: Response): Promise<any> => {
 
         // 4. Ejecutar docker-compose up
         // Usamos variables de entorno en el comando para hidratar la plantilla
-        const command = `USER_ID=${userId} HOST_PORT=${port} docker-compose -f ${path.join(composeDestDir, 'docker-compose.yml')} -p agent-${userId} up -d`;
+        const command = `USER_ID=${userId} HOST_PORT=${port} TELEGRAM_BOT_TOKEN=${telegramToken || ''} docker-compose -f ${path.join(composeDestDir, 'docker-compose.yml')} -p agent-${userId} up -d`;
 
-        console.log(`Lanzando agente para usuario ${userId}...`);
+        console.log(`Lanzando agente para usuario ${userId} (Telegram: ${telegramToken ? 'SÍ' : 'NO'})...`);
         const { stdout, stderr } = await execPromise(command, {
-            env: { ...process.env, USER_ID: userId, HOST_PORT: port.toString() }
+            env: { 
+                ...process.env, 
+                USER_ID: userId, 
+                HOST_PORT: port.toString(),
+                TELEGRAM_BOT_TOKEN: telegramToken || ''
+            }
         });
 
         if (stderr && stderr.toLowerCase().includes('error')) {
@@ -100,6 +105,16 @@ app.post('/api/agents', async (req: Request, res: Response): Promise<any> => {
                     for (const dev of (devices.pending || [])) {
                         console.log(`Auto-aprobando dispositivo para ${uid}: ${dev.requestId}`);
                         await execPromise(`docker exec openclaw-agent-${uid} node dist/index.js devices approve ${dev.requestId}`);
+                    }
+
+                    // 2. Auto-aprobar vinculaciones de Telegram
+                    const tgListCmd = `docker exec openclaw-agent-${uid} node dist/index.js pairing list telegram --json`;
+                    const { stdout: tgListOut } = await execPromise(tgListCmd);
+                    const tgRequests = JSON.parse(tgListOut);
+                    
+                    for (const req of (tgRequests.requests || [])) {
+                        console.log(`Auto-aprobando Telegram para ${uid}: Code ${req.code}`);
+                        await execPromise(`docker exec openclaw-agent-${uid} node dist/index.js pairing approve telegram ${req.code}`);
                     }
                 } catch (e) { /* Silencioso */ }
             }, 5000);
