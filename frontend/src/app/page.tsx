@@ -31,6 +31,7 @@ const BuildingLego = () => (
 );
 
 export default function AgentLauncher() {
+  console.log("🛠️ OpenClaw Neural UI cargado v1.1 - Esperando interacción...");
   const [userId, setUserId] = useState("");
   const [telegramToken, setTelegramToken] = useState("");
   const [loading, setLoading] = useState(false);
