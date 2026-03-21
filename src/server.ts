@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { exec } from 'child_process';
 import util from 'util';
+import cors from 'cors';
 import fs from 'fs/promises';
 import path from 'path';
 import dotenv from 'dotenv';
@@ -12,6 +13,7 @@ import net from 'net';
 
 const execPromise = util.promisify(exec);
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 // Función para encontrar un puerto libre dinámicamente
@@ -176,8 +178,8 @@ app.post('/api/agents/approve', async (req: Request, res: Response): Promise<any
 
     try {
         const containerName = `openclaw-agent-${userId}`;
-        const listCommand = `docker exec ${containerName} node dist/index.js devices list --json`;
-        const { stdout } = await execPromise(listCommand);
+        const listCommand = `docker exec -e NODE_OPTIONS="--max-old-space-size=256" ${containerName} openclaw devices list --json`;
+        const { stdout } = await (execPromise(listCommand, { timeout: 10000 }) as any);
 
         const devices = JSON.parse(stdout);
         if (!devices.pending || devices.pending.length === 0) {
@@ -186,9 +188,8 @@ app.post('/api/agents/approve', async (req: Request, res: Response): Promise<any
 
         const approvals = [];
         for (const device of devices.pending) {
-            // Aprobar automáticamente cada dispositivo en espera (ideal para SaaS 1:1)
-            const approveCommand = `docker exec ${containerName} node dist/index.js devices approve ${device.requestId}`;
-            await execPromise(approveCommand);
+            const approveCommand = `docker exec -e NODE_OPTIONS="--max-old-space-size=256" ${containerName} openclaw devices approve ${device.requestId}`;
+            await (execPromise(approveCommand, { timeout: 10000 }) as any);
             approvals.push(device.requestId);
         }
 
