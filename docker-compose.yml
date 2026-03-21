@@ -20,6 +20,7 @@ services:
       - USER_ID=${USER_ID}
       - HOST_PORT=${HOST_PORT}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - PUBLIC_IP=${PUBLIC_IP:-localhost}
       # Tu API inyectará esta variable automáticamente si está configurada en .env
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - TZ=America/Mexico_City
@@ -61,11 +62,13 @@ services:
             
             // Forzar los orígenes de mi puerto dinámico real
             const myPort = process.env.HOST_PORT;
+            const publicIp = process.env.PUBLIC_IP || 'localhost';
             data.gateway.controlUi.allowedOrigins = [
               ...new Set([
                 ...(data.gateway.controlUi.allowedOrigins || []),
                 'http://localhost:' + myPort,
-                'http://127.0.0.1:' + myPort
+                'http://127.0.0.1:' + myPort,
+                'http://' + publicIp + ':' + myPort
               ])
             ];
 

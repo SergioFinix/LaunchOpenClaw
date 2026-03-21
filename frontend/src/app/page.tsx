@@ -43,7 +43,8 @@ export default function AgentLauncher() {
     setResult(null);
 
     try {
-      const response = await fetch("http://localhost:3000/api/agents", {
+      const apiHost = typeof window !== "undefined" ? window.location.hostname : "localhost";
+      const response = await fetch(`http://${apiHost}:3000/api/agents`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, telegramToken }),
@@ -74,7 +75,8 @@ export default function AgentLauncher() {
     let success = false;
     for (let i = 0; i < 5; i++) {
         try {
-            const res = await fetch("http://localhost:3000/api/agents/approve", {
+            const apiHost = typeof window !== "undefined" ? window.location.hostname : "localhost";
+            const res = await fetch(`http://${apiHost}:3000/api/agents/approve`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ userId }),

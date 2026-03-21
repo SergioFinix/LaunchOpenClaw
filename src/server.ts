@@ -133,7 +133,8 @@ app.post('/api/agents', async (req: Request, res: Response): Promise<any> => {
         startAutoApprove(userId);
 
         // 5. Retornar éxito con URL completa (con token)
-        const agentUrl = `http://localhost:${port}/#token=${token}`;
+        const publicIp = process.env.PUBLIC_IP || 'localhost';
+        const agentUrl = `http://${publicIp}:${port}/#token=${token}`;
         return res.status(200).json({
             success: true,
             userId,
