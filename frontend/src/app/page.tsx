@@ -97,11 +97,7 @@ export default function AgentLauncher() {
       <div className="cyber-bg" />
       <div className="cyber-grid absolute inset-0 z-0 opacity-20" />
 
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-xl z-10"
-      >
+      <div className="w-full max-w-xl z-10 transition-opacity duration-1000">
         {/* Header Section */}
         <div className="text-center mb-10">
           <motion.div
@@ -244,7 +240,7 @@ export default function AgentLauncher() {
             L3 Encryption
           </div>
         </div>
-      </motion.div>
+      </div>
     </main>
   );
 }
