@@ -44,14 +44,19 @@ export default function AgentLauncher() {
 
     try {
       const apiHost = typeof window !== "undefined" ? window.location.hostname : "localhost";
-      const response = await fetch(`http://${apiHost}:3000/api/agents`, {
+      const apiUrl = `http://${apiHost}:3000/api/agents`;
+      console.log("🚀 Desplegando agente via:", apiUrl);
+
+      const response = await fetch(apiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, telegramToken }),
       });
       const data = await response.json();
+      console.log("✅ Respuesta del Maestro:", data);
       setResult(data);
     } catch (err) {
+      console.error("❌ Error de conexión con el Maestro:", err);
       setResult({ success: false, error: "Failed to connect to Neural Master Server" });
     } finally {
       setLoading(false);
