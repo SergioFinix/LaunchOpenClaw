@@ -10,12 +10,12 @@ services:
       # Mapeo del puerto de la máquina (generado por la API) al 18789 del contenedor
       - "${HOST_PORT}:18789"
     volumes:
-      # Corregido: la imagen de OpenClaw usa /home/node, no /home/openclaw
-      - ./data/agents/${USER_ID}/.openclaw:/home/node/.openclaw
-      - ./workspace/${USER_ID}:/workspace
+      # Usamos rutas relativas al archivo docker-compose.yml (que ya está en la carpeta del agente)
+      - ./.openclaw:/home/node/.openclaw
+      - ./workspace:/workspace
     environment:
       - NODE_ENV=production
-      - NODE_OPTIONS=--max-old-space-size=4096
+      - NODE_OPTIONS=--max-old-space-size=2048
       # Inyectar variables para el parche de seguridad de Origen y Telegram
       - USER_ID=${USER_ID}
       - HOST_PORT=${HOST_PORT}
@@ -29,8 +29,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.0'
-          memory: 3000M
+          cpus: '2.0'
+          memory: 4000M
+    healthcheck:
+      disable: true
     command: >
       sh -c "
         CONFIG_DIR=/home/node/.openclaw
@@ -51,6 +53,11 @@ services:
             data.gateway = data.gateway || {};
             data.gateway.controlUi = data.gateway.controlUi || {};
             data.gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback = true;
+            
+            // LIMPIEZA: Eliminar claves que causaron errores en versiones anteriores
+            delete data.gateway.dmPolicy;
+            delete data.gateway.controlUi.dangerouslyAllowAnyDevice;
+            delete data.gateway.controlUi.dmPolicy;
             
             // Forzar los orígenes de mi puerto dinámico real
             const myPort = process.env.HOST_PORT;

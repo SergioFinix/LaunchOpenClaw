@@ -41,10 +41,11 @@ app.post('/api/agents', async (req: Request, res: Response): Promise<any> => {
 
     try {
         const port = await getFreePort(18789);
-        const agentDir = path.resolve(__dirname, `../data/agents/${userId}/.openclaw`);
-        const workspaceDir = path.resolve(__dirname, `../workspace/${userId}`);
+        const agentBaseDir = path.resolve(__dirname, `../data/agents/${userId}`);
+        const agentDir = path.join(agentBaseDir, '.openclaw');
+        const workspaceDir = path.join(agentBaseDir, 'workspace');
         const composeTemplateSrc = path.resolve(__dirname, '../docker-compose.yml');
-        const composeDestDir = path.resolve(__dirname, `../data/agents/${userId}`);
+        const composeDestDir = agentBaseDir;
 
         // 2. Crear directorios
         await fs.mkdir(agentDir, { recursive: true });
@@ -95,28 +96,35 @@ app.post('/api/agents', async (req: Request, res: Response): Promise<any> => {
             let attempts = 0;
             const interval = setInterval(async () => {
                 attempts++;
-                if (attempts > 24) return clearInterval(interval); // Parar tras 2min (24 * 5s)
+                if (attempts > 120) return clearInterval(interval); // Parar tras 10min (120 * 5s)
 
                 try {
-                    const listCmd = `docker exec openclaw-agent-${uid} node dist/index.js devices list --json`;
-                    const { stdout: listOut } = await execPromise(listCmd);
+                    // 1. Auto-aprobar dispositivos de Navegador (Web)
+                    // Usamos un heap pequeño (256MB) y un timeout de 10s para no colgar el loop
+                    const listCmd = `docker exec -e NODE_OPTIONS="--max-old-space-size=256" openclaw-agent-${uid} openclaw devices list --json`;
+                    const { stdout: listOut } = await (execPromise(listCmd, { timeout: 10000 }) as any);
                     const devices = JSON.parse(listOut);
 
                     for (const dev of (devices.pending || [])) {
                         console.log(`Auto-aprobando dispositivo para ${uid}: ${dev.requestId}`);
-                        await execPromise(`docker exec openclaw-agent-${uid} node dist/index.js devices approve ${dev.requestId}`);
+                        await (execPromise(`docker exec -e NODE_OPTIONS="--max-old-space-size=256" openclaw-agent-${uid} openclaw devices approve ${dev.requestId}`, { timeout: 10000 }) as any);
                     }
 
                     // 2. Auto-aprobar vinculaciones de Telegram
-                    const tgListCmd = `docker exec openclaw-agent-${uid} node dist/index.js pairing list telegram --json`;
-                    const { stdout: tgListOut } = await execPromise(tgListCmd);
+                    const tgListCmd = `docker exec -e NODE_OPTIONS="--max-old-space-size=256" openclaw-agent-${uid} openclaw pairing list telegram --json`;
+                    const { stdout: tgListOut } = await (execPromise(tgListCmd, { timeout: 10000 }) as any);
                     const tgRequests = JSON.parse(tgListOut);
                     
                     for (const req of (tgRequests.requests || [])) {
                         console.log(`Auto-aprobando Telegram para ${uid}: Code ${req.code}`);
-                        await execPromise(`docker exec openclaw-agent-${uid} node dist/index.js pairing approve telegram ${req.code}`);
+                        await (execPromise(`docker exec -e NODE_OPTIONS="--max-old-space-size=256" openclaw-agent-${uid} openclaw pairing approve telegram ${req.code}`, { timeout: 10000 }) as any);
                     }
-                } catch (e) { /* Silencioso */ }
+                } catch (e: any) {
+                    // Solo loguear si no es un error de "no tal contenedor" o similar esperado al inicio
+                    if (!e.message.includes("No such container") && !e.message.includes("ETIMEDOUT")) {
+                        console.error(`[AutoApprove ${uid}] Error: ${e.message}`);
+                    }
+                }
             }, 5000);
         };
 
@@ -130,7 +138,7 @@ app.post('/api/agents', async (req: Request, res: Response): Promise<any> => {
             port,
             token,
             agentUrl,
-            message: "Agente aprovisionado y auto-aprobación activada por 2 minutos..."
+            message: "Agente aprovisionado y auto-aprobación activada por 10 minutos..."
         });
 
     } catch (error: any) {
