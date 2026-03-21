@@ -125,7 +125,7 @@ export default function AgentLauncher() {
           
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-cyber-cyan ml-1">Agent Identifier</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-cyber-orange ml-1">Agent Identifier</label>
               <div className="relative">
                 <input
                   type="text"
@@ -140,7 +140,7 @@ export default function AgentLauncher() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-cyber-cyan ml-1">Telegram Neural Link (Optional)</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-cyber-orange ml-1">Telegram Neural Link (Optional)</label>
               <div className="relative">
                 <input
                   type="text"
@@ -158,7 +158,7 @@ export default function AgentLauncher() {
               disabled={loading}
               className={cn(
                 "w-full py-4 rounded-xl font-bold uppercase tracking-widest transition-all relative overflow-hidden group min-h-[64px]",
-                loading ? "bg-slate-800 text-slate-500 cursor-not-allowed" : "bg-cyber-cyan text-slate-950 hover:bg-white hover:neon-glow"
+                loading ? "bg-slate-800 text-slate-500 cursor-not-allowed" : "bg-cyber-orange text-slate-950 hover:bg-white hover:neon-orange-glow"
               )}
             >
               <span className="relative z-10 flex items-center justify-center gap-4">

@@ -5,6 +5,7 @@
   --foreground: #f8fafc;
   --cyber-cyan: #22d3ee;
   --cyber-pink: #f472b6;
+  --cyber-orange: #ff9d00;
   --cyber-blue: #3b82f6;
 }
 
@@ -13,6 +14,7 @@
   --color-foreground: var(--foreground);
   --color-cyber-cyan: var(--cyber-cyan);
   --color-cyber-pink: var(--cyber-pink);
+  --color-cyber-orange: var(--cyber-orange);
   --color-cyber-blue: var(--cyber-blue);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -54,6 +56,10 @@ body {
 
 .neon-glow {
   box-shadow: 0 0 15px rgba(34, 211, 238, 0.4);
+}
+
+.neon-orange-glow {
+  box-shadow: 0 0 15px rgba(255, 157, 0, 0.5);
 }
 
 .neon-text {
