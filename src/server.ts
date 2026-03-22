@@ -290,47 +290,17 @@ ${agent.soul ? `\nInstrucciones adicionales de personalidad: ${agent.soul}` : 'A
 }
 
 /**
- * Parchea el openclaw.json para registrar los sub-agentes locales y configurar el modelo
+ * Parchea el openclaw.json con lo mínimo necesario para arrancar el gateway
  */
-async function patchOpenClawConfig(companyBaseDir: string, departments: AgentConfig[], mainAgent: AgentConfig) {
-    const configPath = path.join(companyBaseDir, 'openclaw.json'); // Corregido: sin .openclaw redundante
-    const authPath = path.join(companyBaseDir, 'agents/main/agent/auth-profiles.json');
-    
-    let config: any = { agents: {}, gateway: { host: "0.0.0.0" } };
-    try {
-        const existing = await fs.readFile(configPath, 'utf8');
-        config = JSON.parse(existing);
-    } catch (e) {}
-
-    if (!config.agents) config.agents = {};
-
-    // 1. Configurar Model/Provider principal
-    // Forzamos OpenAI por defecto como pidió el usuario
-    const modelStr = mainAgent.model || 'gpt-4o';
-    const isAnthropic = modelStr.toLowerCase().includes('claude') || modelStr.toLowerCase().includes('anthropic');
-    const provider = isAnthropic ? 'anthropic' : 'openai';
-    
-    config.provider = provider;
-    config.model = modelStr;
-
-    // 2. Registrar cada departamento
-    for (const dept of departments) {
-        const role = dept.role.toLowerCase();
-        config.agents[role] = { path: `agents/${role}` };
-    }
-
+async function prepareMinimalConfig(companyBaseDir: string) {
+    const configPath = path.join(companyBaseDir, 'openclaw.json');
+    const config = {
+        gateway: {
+            host: "0.0.0.0",
+            port: 18789
+        }
+    };
     await fs.writeFile(configPath, JSON.stringify(config, null, 2));
-
-    // 3. Crear Perfil de Autenticación si hay API Key
-    if (mainAgent.apiKey) {
-        const authConfig = {
-            [provider]: {
-                apiKey: mainAgent.apiKey
-            }
-        };
-        await fs.mkdir(path.dirname(authPath), { recursive: true });
-        await fs.writeFile(authPath, JSON.stringify(authConfig, null, 2));
-    }
 }
 
 // --- PHASE 1: ENTERPRISE ORCHESTRATOR ---
@@ -369,8 +339,8 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
             await injectAgentContext(deptDir, companyId, role, plandeempresa, dept);
         }
 
-        // 2. REGISTRO DE SUB-AGENTES Y MODELO (openclaw.json)
-        await patchOpenClawConfig(companyBaseDir, departments, mainAgent);
+        // 2. CONFIGURACIÓN MÍNIMA
+        await prepareMinimalConfig(companyBaseDir);
 
         // PARCHE DE PERMISOS FINAL
         try { await execPromise(`sudo chown -R 1000:1000 "${companyBaseDir}"`); } catch (e) {}
@@ -382,17 +352,47 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
 
         // 4. LANZAR INSTANCIA (PHASE 2)
         const publicIp = process.env.PUBLIC_IP || 'localhost';
+        const containerName = `oc-${companyId}`;
         const command = `docker-compose -f ${path.join(companyBaseDir, 'docker-compose.yml')} -p oc-${companyId} up -d`;
         
-        console.log(`🐳 Lanzando Instancia Empresarial: ${companyId} en puerto ${port}...`);
+        console.log(`🐳 Lanzando Instancia Empresarial: ${companyId}...`);
         await execPromise(command, { env: { ...process.env, PUBLIC_IP: publicIp } });
+
+        // 5. CONFIGURACIÓN VÍA CLI (POST-START)
+        // Esperamos 5 segundos a que el contenedor esté listo
+        setTimeout(async () => {
+            try {
+                const modelStr = mainAgent.model || 'gpt-4o';
+                const isAnthropic = modelStr.toLowerCase().includes('claude') || modelStr.toLowerCase().includes('anthropic');
+                const provider = isAnthropic ? 'anthropic' : 'openai';
+
+                console.log(`   [CLI] Configurando modelo ${modelStr}...`);
+                await execPromise(`docker exec ${containerName} openclaw config set agent.provider ${provider}`);
+                await execPromise(`docker exec ${containerName} openclaw config set agent.model ${modelStr}`);
+
+                if (ceoWithMetadata.apiKey) {
+                    console.log(`   [CLI] Configurando API Key para ${provider}...`);
+                    await execPromise(`docker exec ${containerName} openclaw auth add ${provider} ${ceoWithMetadata.apiKey}`);
+                }
+
+                for (const dept of departments) {
+                    const role = dept.role.toLowerCase();
+                    console.log(`   [CLI] Registrando sub-agente: ${role}...`);
+                    await execPromise(`docker exec ${containerName} openclaw agents add ${role} --path agents/${role}`);
+                }
+                
+                console.log(`✅ Configuración CLI completada para ${companyId}.`);
+            } catch (e: any) {
+                console.warn(`⚠️ Error en configuración CLI: ${e.message}`);
+            }
+        }, 5000);
 
         return res.status(200).json({
             success: true,
             companyId,
             url: `http://${publicIp}:${port}/`,
             roles: ['ceo', ...departments.map(d => d.role.toLowerCase())],
-            message: `Consolidated Instance for ${companyId} is online.`
+            message: `Consolidated Instance for ${companyId} is online and configuring in background.`
         });
 
     } catch (error: any) {
