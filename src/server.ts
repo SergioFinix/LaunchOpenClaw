@@ -380,13 +380,14 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
                 const modelStr = mainAgent.model || 'gpt-4o';
                 const isAnthropic = modelStr.toLowerCase().includes('claude') || modelStr.toLowerCase().includes('anthropic');
                 const provider = isAnthropic ? 'anthropic' : 'openai';
+                const fullModel = `${provider}/${modelStr.replace(`${provider}/`, '')}`; // Evitar duplicar provider/provider/model
 
                 console.log(`   [CLI] Sanando configuración (Doctor)...`);
                 await execPromise(`docker exec ${containerName} ${cli} doctor --fix --yes 2>&1 || true`);
 
-                console.log(`   [CLI] Configurando modelo ${modelStr}...`);
-                await execPromise(`docker exec ${containerName} ${cli} config set agents.defaults.provider ${provider} 2>&1`);
-                await execPromise(`docker exec ${containerName} ${cli} config set agents.defaults.model ${modelStr} 2>&1`);
+                console.log(`   [CLI] Configurando modelo ${fullModel}...`);
+                // En las nuevas versiones, el provider se incluye en el string del modelo: provider/model
+                await execPromise(`docker exec ${containerName} ${cli} config set agents.defaults.model ${fullModel} 2>&1`);
 
                 if (ceoWithMetadata.apiKey) {
                     console.log(`   [CLI] Configurando API Key para ${provider}...`);
