@@ -314,19 +314,13 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
             { 
                 ...mainAgent, 
                 role: 'ceo', 
-                // Añadimos el token al CEO específicamente
-                apiKey: mainAgent.apiKey || telegramToken 
+                apiKey: mainAgent.apiKey || llmApiKey || process.env.OPENAI_API_KEY 
             }, 
-            ...departments
+            ...departments.map(d => ({
+                ...d,
+                apiKey: d.apiKey || llmApiKey || process.env.OPENAI_API_KEY
+            }))
         ];
-
-        // NOTA: Para que el composer.ts use telegramToken, lo pasamos como propiedad
-        const agentsToCompose = allAgents.map(a => ({
-            ...a,
-            telegramToken: a.role === 'ceo' ? telegramToken : '',
-            // Si el agente no tiene api key propia, usamos la global de la empresa o la del .env
-            apiKey: a.apiKey || llmApiKey || process.env.OPENAI_API_KEY
-        }));
 
         const provisionedAgents = [];
 
@@ -336,34 +330,28 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
             
             // Ruta jerárquica: data/agents/COMPANY/ROLE
             const agentBaseDir = path.resolve(__dirname, `../data/agents/${companyId}/${role}`);
-            const agentDir = path.join(agentBaseDir, '.openclaw');
-            const workspaceDir = path.join(agentBaseDir, 'workspace');
+            
+            console.log(`   [${role}] Preparando en puerto ${port}...`);
+            await fs.mkdir(path.join(agentBaseDir, '.openclaw/agents/main/agent'), { recursive: true });
+            await fs.mkdir(path.join(agentBaseDir, 'workspace'), { recursive: true });
 
-            console.log(`   [${role}] Preparando directorios en ${agentBaseDir}...`);
-            await fs.mkdir(path.join(agentDir, 'agents/main/agent'), { recursive: true });
-            await fs.mkdir(workspaceDir, { recursive: true });
+            // PARCHE DE PERMISOS
+            try { await execPromise(`sudo chown -R 1000:1000 "${agentBaseDir}"`); } catch (e) {}
 
-            // PARCHE DE PERMISOS (VPS)
-            try {
-                await execPromise(`sudo chown -R 1000:1000 "${agentBaseDir}"`);
-            } catch (e) {}
-
-            // 1. Preparar Contexto Estratégico (PHASE 3)
+            // 1. Inyectar Contexto Estratégico (PHASE 3)
             await injectAgentContext(agentBaseDir, companyId, role, plandeempresa, agent);
-
-            // Se activarán en las siguientes fases.
             
             provisionedAgents.push({
                 ...agent,
                 role,
                 port,
-                dir: agentBaseDir
+                telegramToken: role === 'ceo' ? telegramToken : ''
             });
         }
 
         // 2. GENERAR Y GUARDAR DOCKER-COMPOSE.YML (PHASE 2)
         const companyBaseDir = path.resolve(__dirname, `../data/agents/${companyId}`);
-        const composeYaml = generateCompanyCompose(companyId, agentsToCompose);
+        const composeYaml = generateCompanyCompose(companyId, provisionedAgents);
         await fs.writeFile(path.join(companyBaseDir, 'docker-compose.yml'), composeYaml);
 
         // 3. LANZAR CLUSTER (PHASE 2)

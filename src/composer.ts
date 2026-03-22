@@ -40,8 +40,7 @@ export const generateCompanyCompose = (companyId: string, agents: any[]): string
 `;
     }
 
-    return `version: '3.8'
-services:
+    return `services:
 ${services}
 `;
 };
