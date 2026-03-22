@@ -293,8 +293,8 @@ ${agent.soul ? `\nInstrucciones adicionales de personalidad: ${agent.soul}` : 'A
  * Parchea el openclaw.json para registrar los sub-agentes locales y configurar el modelo
  */
 async function patchOpenClawConfig(companyBaseDir: string, departments: AgentConfig[], mainAgent: AgentConfig) {
-    const configPath = path.join(companyBaseDir, '.openclaw', 'openclaw.json');
-    const authPath = path.join(companyBaseDir, '.openclaw', 'agents/main/agent/auth-profiles.json');
+    const configPath = path.join(companyBaseDir, 'openclaw.json'); // Corregido: sin .openclaw redundante
+    const authPath = path.join(companyBaseDir, 'agents/main/agent/auth-profiles.json');
     
     let config: any = { agents: {}, gateway: { host: "0.0.0.0" } };
     try {
@@ -350,19 +350,19 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         console.log(`🏗️  Creando Instancia Consolidada: ${companyId}...`);
         
         const companyBaseDir = path.resolve(__dirname, `../data/agents/${companyId}`);
-        const masterAgentDir = path.join(companyBaseDir, '.openclaw');
         const port = await getFreePort(18789);
 
         // 1. PREPARACIÓN DE DIRECTORIOS
-        await fs.mkdir(path.join(masterAgentDir, 'agents/main/agent'), { recursive: true });
+        // El companyBaseDir ya mapea a /root/.openclaw dentro de Docker
+        await fs.mkdir(path.join(companyBaseDir, 'agents/main/agent'), { recursive: true });
         
         // CEO Agent (Master)
-        await injectAgentContext(masterAgentDir, companyId, 'ceo', plandeempresa, mainAgent, true);
+        await injectAgentContext(companyBaseDir, companyId, 'ceo', plandeempresa, mainAgent, true);
 
         // Departamentos (Sub-folders internos)
         for (const dept of departments) {
             const role = dept.role.toLowerCase();
-            const deptDir = path.join(masterAgentDir, 'agents', role);
+            const deptDir = path.join(companyBaseDir, 'agents', role);
             await fs.mkdir(path.join(deptDir, 'agent'), { recursive: true });
             
             console.log(`   [${role}] Inyectando ADN en sub-carpeta...`);
