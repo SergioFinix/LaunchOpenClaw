@@ -304,6 +304,7 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
     const configPath = path.join(companyDir, 'openclaw.json');
     const initialConfig = {
         gateway: {
+            host: "0.0.0.0", // Forzamos escucha externa
             auth: {
                 token: token
             }
