@@ -385,8 +385,8 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
                 await execPromise(`docker exec ${containerName} ${cli} doctor --fix --yes 2>&1 || true`);
 
                 console.log(`   [CLI] Configurando modelo ${modelStr}...`);
-                await execPromise(`docker exec ${containerName} ${cli} config set agent.provider ${provider} 2>&1`);
-                await execPromise(`docker exec ${containerName} ${cli} config set agent.model ${modelStr} 2>&1`);
+                await execPromise(`docker exec ${containerName} ${cli} config set agents.defaults.provider ${provider} 2>&1`);
+                await execPromise(`docker exec ${containerName} ${cli} config set agents.defaults.model ${modelStr} 2>&1`);
 
                 if (ceoWithMetadata.apiKey) {
                     console.log(`   [CLI] Configurando API Key para ${provider}...`);
