@@ -4,7 +4,7 @@ services:
   openclaw-agent:
     image: ghcr.io/openclaw/openclaw:latest
     container_name: openclaw-agent-${USER_ID}
-    # Ejecutamos como el usuario 1000 para mayor seguridad (No Root)
+    # Ejecutamos como el usuario 1000 para mayor seguridad (No Root) - funcional
     user: "0:0"
     shm_size: '512mb'
     network_mode: bridge
