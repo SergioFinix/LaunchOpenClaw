@@ -95,7 +95,7 @@ app.post('/api/agents', async (req: Request, res: Response): Promise<any> => {
         for (let i = 0; i < 10; i++) {
             try {
                 await new Promise(r => setTimeout(r, 2000)); // Esperar 2s entre intentos
-                const { stdout: tokenOut } = await execPromise(`docker exec -e NODE_OPTIONS="--max-old-space-size=512" ${containerName} node dist/index.js dashboard --no-open`);
+                const { stdout: tokenOut } = await execPromise(`docker exec -e NODE_OPTIONS="--max-old-space-size=1024" ${containerName} node dist/index.js dashboard --no-open`);
                 const match = tokenOut.match(/#token=([a-f0-9]+)/);
                 if (match && match[1]) {
                     token = match[1];
@@ -114,23 +114,23 @@ app.post('/api/agents', async (req: Request, res: Response): Promise<any> => {
                 try {
                     // 1. Auto-aprobar dispositivos de Navegador (Web)
                     // Usamos un heap pequeño (256MB) y un timeout de 10s para no colgar el loop
-                    const listCmd = `docker exec -e NODE_OPTIONS="--max-old-space-size=512" openclaw-agent-${uid} openclaw devices list --json`;
+                    const listCmd = `docker exec -e NODE_OPTIONS="--max-old-space-size=1024" openclaw-agent-${uid} openclaw devices list --json`;
                     const { stdout: listOut } = await (execPromise(listCmd, { timeout: 10000 }) as any);
                     const devices = JSON.parse(listOut);
 
                     for (const dev of (devices.pending || [])) {
                         console.log(`Auto-aprobando dispositivo para ${uid}: ${dev.requestId}`);
-                        await (execPromise(`docker exec -e NODE_OPTIONS="--max-old-space-size=512" openclaw-agent-${uid} openclaw devices approve ${dev.requestId}`, { timeout: 10000 }) as any);
+                        await (execPromise(`docker exec -e NODE_OPTIONS="--max-old-space-size=1024" openclaw-agent-${uid} openclaw devices approve ${dev.requestId}`, { timeout: 10000 }) as any);
                     }
 
                     // 2. Auto-aprobar vinculaciones de Telegram
-                    const tgListCmd = `docker exec -e NODE_OPTIONS="--max-old-space-size=512" openclaw-agent-${uid} openclaw pairing list telegram --json`;
+                    const tgListCmd = `docker exec -e NODE_OPTIONS="--max-old-space-size=1024" openclaw-agent-${uid} openclaw pairing list telegram --json`;
                     const { stdout: tgListOut } = await (execPromise(tgListCmd, { timeout: 10000 }) as any);
                     const tgRequests = JSON.parse(tgListOut);
                     
                     for (const req of (tgRequests.requests || [])) {
                         console.log(`Auto-aprobando Telegram para ${uid}: Code ${req.code}`);
-                        await (execPromise(`docker exec -e NODE_OPTIONS="--max-old-space-size=512" openclaw-agent-${uid} openclaw pairing approve telegram ${req.code}`, { timeout: 10000 }) as any);
+                        await (execPromise(`docker exec -e NODE_OPTIONS="--max-old-space-size=1024" openclaw-agent-${uid} openclaw pairing approve telegram ${req.code}`, { timeout: 10000 }) as any);
                     }
                 } catch (e: any) {
                     // Solo loguear si no es un error de "no tal contenedor" o similar esperado al inicio
@@ -138,7 +138,7 @@ app.post('/api/agents', async (req: Request, res: Response): Promise<any> => {
                         console.error(`[AutoApprove ${uid}] Error: ${e.message}`);
                     }
                 }
-            }, 5000);
+            }, 15000);
         };
 
         startAutoApprove(userId);
@@ -190,7 +190,7 @@ app.post('/api/agents/approve', async (req: Request, res: Response): Promise<any
 
     try {
         const containerName = `openclaw-agent-${userId}`;
-        const listCommand = `docker exec -e NODE_OPTIONS="--max-old-space-size=512" ${containerName} openclaw devices list --json`;
+        const listCommand = `docker exec -e NODE_OPTIONS="--max-old-space-size=1024" ${containerName} openclaw devices list --json`;
         const { stdout } = await (execPromise(listCommand, { timeout: 10000 }) as any);
 
         const devices = JSON.parse(stdout);
@@ -200,7 +200,7 @@ app.post('/api/agents/approve', async (req: Request, res: Response): Promise<any
 
         const approvals = [];
         for (const device of devices.pending) {
-            const approveCommand = `docker exec -e NODE_OPTIONS="--max-old-space-size=512" ${containerName} openclaw devices approve ${device.requestId}`;
+            const approveCommand = `docker exec -e NODE_OPTIONS="--max-old-space-size=1024" ${containerName} openclaw devices approve ${device.requestId}`;
             await (execPromise(approveCommand, { timeout: 10000 }) as any);
             approvals.push(device.requestId);
         }
