@@ -10,8 +10,28 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import net from 'net';
+import { generateCompanyCompose } from './composer';
 
 const execPromise = util.promisify(exec);
+
+// --- ENTERPRISE TYPES ---
+export interface AgentConfig {
+    role: string;
+    model?: string;
+    priority?: 'high' | 'low';
+    soul?: string;
+    skills?: string[];
+    apiKey?: string;
+}
+
+interface CompanyRequest {
+    companyId: string;
+    telegramToken?: string;
+    plandeempresa: string;
+    mainAgent: AgentConfig; // The CEO
+    departments: AgentConfig[];
+}
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -236,6 +256,131 @@ app.post('/api/agents/approve', async (req: Request, res: Response): Promise<any
     } catch (error) {
         console.error("Device approve error:", error);
         return res.status(500).json({ success: false, error: "Failed to list or approve devices." });
+    }
+});
+
+// --- PHASE 3: DNA INJECTION HELPERS ---
+async function injectAgentContext(agentDir: string, companyId: string, role: string, businessPlan: string, agent: AgentConfig) {
+    const workspaceDir = path.join(agentDir, 'workspace');
+    
+    // 1. Inyectar ADN Empresarial (MEMORY.md)
+    const memoryContent = `# 🏢 Alineación Estratégica: ${companyId.toUpperCase()}
+Misión Global: ${businessPlan}
+
+# 🧬 Tu Rol en el Cluster
+Eres el agente especializado en: **${role.toUpperCase()}**.
+Prioridad de recursos: ${agent.priority || 'low'}.
+
+Este documento guía tu comportamiento estratégico de largo plazo.
+`;
+    await fs.writeFile(path.join(workspaceDir, 'MEMORY.md'), memoryContent);
+
+    // 2. Inyectar Alma (SOUL.md)
+    const soulContent = `# 🎭 Identidad del Agente
+Rol: ${role}
+Empresa: ${companyId}
+
+Propósito: Tu objetivo es servir a la misión de ${companyId} desde tu especialidad en ${role}. 
+${agent.soul ? `\nInstrucciones adicionales de personalidad: ${agent.soul}` : 'Actúa con profesionalismo y proactividad.'}
+`;
+    await fs.writeFile(path.join(workspaceDir, 'SOUL.md'), soulContent);
+
+    // 3. Preparar AGENTS.md (soul/identity principal)
+    const agentsMdContent = `Nombre: ${role}_${companyId}
+Descripción: Agente de ${role} para el cluster ${companyId}.
+`;
+    await fs.writeFile(path.join(workspaceDir, 'AGENTS.md'), agentsMdContent);
+}
+
+// --- PHASE 1: ENTERPRISE ORCHESTRATOR ---
+app.post('/api/companies', async (req: Request, res: Response): Promise<any> => {
+    const { companyId, telegramToken, plandeempresa, mainAgent, departments } = req.body as CompanyRequest;
+
+    // 1. Validar inputs básicos
+    if (!companyId || !/^[a-zA-Z0-9_-]+$/.test(companyId)) {
+        return res.status(400).json({ success: false, error: "Invalid companyId format." });
+    }
+
+    if (!plandeempresa) {
+        return res.status(400).json({ success: false, error: "Missing plandeempresa (Business DNA)." });
+    }
+
+    try {
+        console.log(`🏗️  Iniciando creación de Empresa: ${companyId}...`);
+        
+        // Unificar CEO y departamentos en una lista de agentes a crear
+        const allAgents: AgentConfig[] = [
+            { ...mainAgent, role: 'ceo' }, // Forzamos el rol CEO para el main
+            ...departments
+        ];
+
+        const provisionedAgents = [];
+
+        for (const agent of allAgents) {
+            const role = agent.role.toLowerCase();
+            const port = await getFreePort(18789 + provisionedAgents.length);
+            
+            // Ruta jerárquica: data/agents/COMPANY/ROLE
+            const agentBaseDir = path.resolve(__dirname, `../data/agents/${companyId}/${role}`);
+            const agentDir = path.join(agentBaseDir, '.openclaw');
+            const workspaceDir = path.join(agentBaseDir, 'workspace');
+
+            console.log(`   [${role}] Preparando directorios en ${agentBaseDir}...`);
+            await fs.mkdir(path.join(agentDir, 'agents/main/agent'), { recursive: true });
+            await fs.mkdir(workspaceDir, { recursive: true });
+
+            // PARCHE DE PERMISOS (VPS)
+            try {
+                await execPromise(`sudo chown -R 1000:1000 "${agentBaseDir}"`);
+            } catch (e) {}
+
+            // 1. Preparar Contexto Estratégico (PHASE 3)
+            await injectAgentContext(agentBaseDir, companyId, role, plandeempresa, agent);
+
+            // Se activarán en las siguientes fases.
+            
+            provisionedAgents.push({
+                ...agent,
+                role,
+                port,
+                dir: agentBaseDir
+            });
+        }
+
+        // 2. GENERAR Y GUARDAR DOCKER-COMPOSE.YML (PHASE 2)
+        const companyBaseDir = path.resolve(__dirname, `../data/agents/${companyId}`);
+        const composeYaml = generateCompanyCompose(companyId, provisionedAgents);
+        await fs.writeFile(path.join(companyBaseDir, 'docker-compose.yml'), composeYaml);
+
+        // 3. LANZAR CLUSTER (PHASE 2)
+        const publicIp = process.env.PUBLIC_IP || 'localhost';
+        const command = `docker-compose -f ${path.join(companyBaseDir, 'docker-compose.yml')} -p cluster-${companyId} up -d`;
+        
+        console.log(`🐳 Lanzando cluster empresarial: ${companyId}...`);
+        const { stdout, stderr } = await execPromise(command, { 
+            env: { ...process.env, PUBLIC_IP: publicIp } 
+        });
+
+        if (stdout) console.log(`[Docker Cluster Out]: ${stdout}`);
+        if (stderr) console.warn(`[Docker Cluster Warn]: ${stderr}`);
+
+        // 4. PREPARAR RESPUESTA
+        const agentsWithUrls = provisionedAgents.map(a => ({
+            role: a.role,
+            port: a.port,
+            url: `http://${publicIp}:${a.port}/`
+        }));
+
+        return res.status(200).json({
+            success: true,
+            companyId,
+            agents: agentsWithUrls,
+            message: `Phase 2 Complete: Cluster ${companyId} is online with ${agentsWithUrls.length} services.`
+        });
+
+    } catch (error: any) {
+        console.error("Error en Phase 1 (Enterprise):", error);
+        return res.status(500).json({ success: false, error: error.message });
     }
 });
 const PORT = process.env.PORT || 3000;
