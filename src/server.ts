@@ -424,6 +424,15 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
             const provider = isAnthropic ? 'anthropic' : 'openai';
             const fullModel = `${provider}/${modelStr.replace(`${provider}/`, '')}`;
 
+            // DIAGNÓSTICO DE CLAVES: Lanzamos esto para ver qué Keys son válidas en esta versión
+            console.log(`   [Discovery] Consultando esquema de configuración...`);
+            const { stdout: configKeys } = await execPromise(`${cli} config get || true`);
+            if (configKeys) console.log(`   [Discovery Keys]: ${configKeys}`);
+
+            console.log(`   [Discovery] Consultando help de gateway...`);
+            const { stdout: gatewayHelp } = await execPromise(`${cli} gateway --help || true`);
+            if (gatewayHelp) console.log(`   [Discovery Help]: ${gatewayHelp}`);
+
             console.log(`   [CLI] Sanando configuración (Doctor)...`);
             await execPromise(`${cli} doctor --fix --yes 2>&1 || true`);
 
