@@ -27,7 +27,6 @@ export interface AgentConfig {
 interface CompanyRequest {
     companyId: string;
     telegramToken?: string;
-    llmApiKey?: string; // Nuevo: Llave global para la empresa
     plandeempresa: string;
     mainAgent: AgentConfig; // The CEO
     departments: AgentConfig[];
@@ -302,7 +301,7 @@ async function clearInitialConfig(companyBaseDir: string) {
 
 // --- PHASE 1: ENTERPRISE ORCHESTRATOR ---
 app.post('/api/companies', async (req: Request, res: Response): Promise<any> => {
-    const { companyId, telegramToken, llmApiKey, plandeempresa, mainAgent, departments } = req.body as CompanyRequest;
+    const { companyId, telegramToken, plandeempresa, mainAgent, departments } = req.body as CompanyRequest;
 
     // 1. Validar inputs básicos
     if (!companyId || !/^[a-zA-Z0-9_-]+$/.test(companyId)) {
@@ -343,7 +342,9 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         try { await execPromise(`sudo chown -R 1000:1000 "${companyBaseDir}"`); } catch (e) {}
 
         // 3. GENERAR DOCKER-COMPOSE.YML (PHASE 2)
-        const ceoWithMetadata = { ...mainAgent, role: 'ceo', port, telegramToken, apiKey: mainAgent.apiKey || llmApiKey || process.env.OPENAI_API_KEY };
+        // Forzamos el uso de la llave del .env del Maestro para simplificar el CURL
+        const masterApiKey = process.env.OPENAI_API_KEY;
+        const ceoWithMetadata = { ...mainAgent, role: 'ceo', port, telegramToken, apiKey: masterApiKey };
         const composeYaml = generateCompanyCompose(companyId, [ceoWithMetadata]);
         await fs.writeFile(path.join(companyBaseDir, 'docker-compose.yml'), composeYaml);
 
