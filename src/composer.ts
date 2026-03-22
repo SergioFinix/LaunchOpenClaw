@@ -17,6 +17,7 @@ export const generateCompanyCompose = (companyId: string, agents: any[]): string
     privileged: true
     init: true
     network_mode: bridge
+    command: ["node", "dist/index.js", "gateway", "--host", "0.0.0.0"]
     ports:
       - "${ceo.port}:18789"
     environment:
