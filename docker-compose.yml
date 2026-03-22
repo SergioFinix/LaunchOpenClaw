@@ -5,8 +5,12 @@ services:
     image: ghcr.io/openclaw/openclaw:latest
     container_name: openclaw-agent-${USER_ID}
     # Ejecutamos como el usuario 1000 para mayor seguridad (No Root)
-    user: "1000:1000"
+    user: "0:0"
+    shm_size: '512mb'
     network_mode: bridge
+    privileged: true
+    cap_add:
+      - ALL
     ports:
       # Mapeo del puerto de la máquina (generado por la API) al 18789 del contenedor
       - "${HOST_PORT}:18789"
@@ -32,7 +36,7 @@ services:
       resources:
         limits:
           cpus: '1.0'
-          memory: 2500M
+          memory: 3000M
     healthcheck:
       disable: true
     command: >
@@ -89,6 +93,7 @@ services:
           }
         \" &&
         
-        echo '=> Starting OpenClaw gateway...' &&
+        echo '=> Starting OpenClaw gateway (Node Version: $(node -v))...' &&
+        free -m &&
         node dist/index.js gateway
       "
