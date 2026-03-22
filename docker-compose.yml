@@ -59,6 +59,7 @@ services:
           if(fs.existsSync(cfg)) {
             let data = JSON.parse(fs.readFileSync(cfg, 'utf8'));
             data.gateway = data.gateway || {};
+            data.gateway.mode = 'local';
             data.gateway.controlUi = data.gateway.controlUi || {};
             data.gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback = true;
             
@@ -96,7 +97,7 @@ services:
         \" &&
         
         echo '=> Starting OpenClaw gateway...' &&
-        node dist/index.js gateway --mode local --allow-unconfigured;
+        node dist/index.js gateway;
         STATUS=$$?;
         echo \"=> Gateway exited with status: $$STATUS\";
         if [ $$STATUS -gt 128 ]; then
