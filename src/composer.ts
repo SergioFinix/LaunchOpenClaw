@@ -24,6 +24,7 @@ export const generateCompanyCompose = (companyId: string, agents: any[]): string
       - NODE_OPTIONS=--max-old-space-size=${agent.priority === 'high' ? 1024 : 512}
       - OPENCLAW_MODE=local
       - OPENCLAW_GATEWAY_MODE=local
+      - OPENAI_API_KEY=${agent.apiKey || ''}
       - TELEGRAM_BOT_TOKEN=${agent.telegramToken || ''}
       - USER_ID=${companyId}-${agent.role}
       - PUBLIC_IP=\${PUBLIC_IP:-localhost}

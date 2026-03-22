@@ -27,6 +27,7 @@ export interface AgentConfig {
 interface CompanyRequest {
     companyId: string;
     telegramToken?: string;
+    llmApiKey?: string; // Nuevo: Llave global para la empresa
     plandeempresa: string;
     mainAgent: AgentConfig; // The CEO
     departments: AgentConfig[];
@@ -294,7 +295,7 @@ Descripción: Agente de ${role} para el cluster ${companyId}.
 
 // --- PHASE 1: ENTERPRISE ORCHESTRATOR ---
 app.post('/api/companies', async (req: Request, res: Response): Promise<any> => {
-    const { companyId, telegramToken, plandeempresa, mainAgent, departments } = req.body as CompanyRequest;
+    const { companyId, telegramToken, llmApiKey, plandeempresa, mainAgent, departments } = req.body as CompanyRequest;
 
     // 1. Validar inputs básicos
     if (!companyId || !/^[a-zA-Z0-9_-]+$/.test(companyId)) {
@@ -310,9 +311,22 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         
         // Unificar CEO y departamentos en una lista de agentes a crear
         const allAgents: AgentConfig[] = [
-            { ...mainAgent, role: 'ceo' }, // Forzamos el rol CEO para el main
+            { 
+                ...mainAgent, 
+                role: 'ceo', 
+                // Añadimos el token al CEO específicamente
+                apiKey: mainAgent.apiKey || telegramToken 
+            }, 
             ...departments
         ];
+
+        // NOTA: Para que el composer.ts use telegramToken, lo pasamos como propiedad
+        const agentsToCompose = allAgents.map(a => ({
+            ...a,
+            telegramToken: a.role === 'ceo' ? telegramToken : '',
+            // Si el agente no tiene api key propia, usamos la global de la empresa o la del .env
+            apiKey: a.apiKey || llmApiKey || process.env.OPENAI_API_KEY
+        }));
 
         const provisionedAgents = [];
 
@@ -349,7 +363,7 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
 
         // 2. GENERAR Y GUARDAR DOCKER-COMPOSE.YML (PHASE 2)
         const companyBaseDir = path.resolve(__dirname, `../data/agents/${companyId}`);
-        const composeYaml = generateCompanyCompose(companyId, provisionedAgents);
+        const composeYaml = generateCompanyCompose(companyId, agentsToCompose);
         await fs.writeFile(path.join(companyBaseDir, 'docker-compose.yml'), composeYaml);
 
         // 3. LANZAR CLUSTER (PHASE 2)
