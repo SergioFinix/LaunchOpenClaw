@@ -21,7 +21,7 @@ services:
       - ./workspace:/workspace
     environment:
       - NODE_ENV=production
-      - NODE_OPTIONS=--max-old-space-size=2048
+      - NODE_OPTIONS=--max-old-space-size=1024
       # Inyectar variables para el parche de seguridad de Origen y Telegram
       - USER_ID=${USER_ID}
       - HOST_PORT=${HOST_PORT}
@@ -33,11 +33,12 @@ services:
       - TERM=xterm-256color
       - BROWSER=echo # Desactiva el auto-open de pestañas de navegador dentro del contenedor
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 3000M
+    # Eliminamos límites para que el VPS maneje la RAM libremente
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '1.0'
+    #       memory: 3000M
     healthcheck:
       disable: true
     command: >
