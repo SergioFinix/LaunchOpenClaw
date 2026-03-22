@@ -17,7 +17,7 @@ services:
       - "${HOST_PORT}:18789"
     volumes:
       # Usamos rutas relativas al archivo docker-compose.yml (que ya está en la carpeta del agente)
-      - ./.openclaw:/home/node/.openclaw
+      - ./.openclaw:/root/.openclaw
       - ./workspace:/workspace
     environment:
       - NODE_ENV=production
@@ -45,7 +45,7 @@ services:
       disable: true
     command: >
       sh -c "
-        CONFIG_DIR=/home/node/.openclaw
+        CONFIG_DIR=/root/.openclaw
         
         if [ ! -f \"$${CONFIG_DIR}/openclaw.json\" ]; then
           echo '=> First time setup: running OpenClaw onboard...'
