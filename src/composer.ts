@@ -17,8 +17,9 @@ export const generateCompanyCompose = (companyId: string, agents: any[]): string
     privileged: true
     init: true
     network_mode: bridge
+    entrypoint: ["/bin/sh", "-c", "node /root/.openclaw/proxy.js & exec node dist/index.js gateway"]
     ports:
-      - "${ceo.port}:18789"
+      - "${ceo.port}:18790"
     environment:
       - "NODE_OPTIONS=--max-old-space-size=2048"
       - "OPENCLAW_MODE=production"

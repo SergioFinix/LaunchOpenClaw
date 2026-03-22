@@ -318,6 +318,22 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
         }
     };
     await fs.writeFile(configPath, JSON.stringify(initialConfig, null, 2));
+
+    // INYECCIÓN DE PROXY TCP: Bypass maestro para el binding hardcodeado a 127.0.0.1
+    const proxyPath = path.join(companyDir, 'proxy.js');
+    const proxyCode = `
+const net = require('net');
+console.log('[Master Proxy] Iniciando puente TCP...');
+net.createServer(c => {
+    c.on('error', () => {});
+    const client = net.createConnection(18789, '127.0.0.1');
+    client.on('error', () => {});
+    c.pipe(client).pipe(c);
+}).listen(18790, '0.0.0.0', () => {
+    console.log('[Master Proxy] Escuchando en 0.0.0.0:18790 -> redirigiendo a 127.0.0.1:18789');
+});
+`;
+    await fs.writeFile(proxyPath, proxyCode);
 }
 
 // --- PHASE 1: ENTERPRISE ORCHESTRATOR ---
