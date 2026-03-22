@@ -96,7 +96,7 @@ services:
         \" &&
         
         echo '=> Starting OpenClaw gateway...' &&
-        node dist/index.js gateway;
+        node dist/index.js gateway --mode local --allow-unconfigured;
         STATUS=$$?;
         echo \"=> Gateway exited with status: $$STATUS\";
         if [ $$STATUS -gt 128 ]; then
