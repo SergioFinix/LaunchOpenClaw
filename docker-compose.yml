@@ -6,6 +6,7 @@ services:
     container_name: openclaw-agent-${USER_ID}
     # Ejecutamos como el usuario 1000 para mayor seguridad (No Root)
     user: "1000:1000"
+    network_mode: bridge
     ports:
       # Mapeo del puerto de la máquina (generado por la API) al 18789 del contenedor
       - "${HOST_PORT}:18789"
@@ -15,7 +16,7 @@ services:
       - ./workspace:/workspace
     environment:
       - NODE_ENV=production
-      - NODE_OPTIONS=--max-old-space-size=2048
+      - NODE_OPTIONS=--max-old-space-size=3072
       # Inyectar variables para el parche de seguridad de Origen y Telegram
       - USER_ID=${USER_ID}
       - HOST_PORT=${HOST_PORT}
@@ -27,11 +28,12 @@ services:
       - TERM=xterm-256color
       - BROWSER=echo # Desactiva el auto-open de pestañas de navegador dentro del contenedor
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 3500M
+    # No limited for diagnostics
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '2.0'
+    #       memory: 3500M
     healthcheck:
       disable: true
     command: >
