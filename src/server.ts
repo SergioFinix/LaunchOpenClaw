@@ -355,7 +355,17 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         const command = `docker-compose -f ${path.join(companyBaseDir, 'docker-compose.yml')} -p ${projectName} up -d`;
         
         console.log(`🐳 Lanzando Instancia Empresarial: ${companyId}...`);
-        await execPromise(command, { env: { ...process.env, PUBLIC_IP: publicIp } });
+        try {
+            const { stdout: launchOut, stderr: launchErr } = await execPromise(command, { env: { ...process.env, PUBLIC_IP: publicIp } });
+            if (launchOut) console.log(`   [Docker Out]: ${launchOut}`);
+            if (launchErr) console.warn(`   [Docker Warn]: ${launchErr}`);
+        } catch (e: any) {
+            console.error(`❌ Error crítico al lanzar Docker: ${e.message}`);
+            // Verificar si el contenedor existe pero está detenido
+            const { stdout: psAll } = await execPromise(`docker ps -a --filter "name=${containerName}"`);
+            console.log(`   [Docker PS -a]: ${psAll || 'No se encontró rastro del contenedor.'}`);
+            throw e; // Relanzar para que el API responda error 500
+        }
 
         // 5. CONFIGURACIÓN Y ESPERA DE TOKEN (SYNC)
         console.log(`⏳ Esperando inicialización de ${containerName}...`);

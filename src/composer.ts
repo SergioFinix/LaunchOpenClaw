@@ -20,16 +20,16 @@ export const generateCompanyCompose = (companyId: string, agents: any[]): string
     ports:
       - "${ceo.port}:18789"
     environment:
-      - NODE_OPTIONS=--max-old-space-size=2048
-      - OPENCLAW_MODE=local
-      - OPENCLAW_GATEWAY_MODE=local
-      - OPENCLAW_GATEWAY_HOST=0.0.0.0
-      - OPENCLAW_AGENTS_DEFAULTS_MODEL=openai/gpt-4o
-      - OPENAI_API_KEY=${ceo.apiKey || ''}
-      - TELEGRAM_BOT_TOKEN=${ceo.telegramToken || ''}
-      - USER_ID=${companyId}
-      - OPENCLAW_GATEWAY_TOKEN=${companyId}_master_token
-      - PUBLIC_IP=\${PUBLIC_IP:-localhost}
+      - "NODE_OPTIONS=--max-old-space-size=2048"
+      - "OPENCLAW_MODE=local"
+      - "OPENCLAW_GATEWAY_MODE=local"
+      - "OPENCLAW_GATEWAY_HOST=0.0.0.0"
+      - "OPENCLAW_AGENTS_DEFAULTS_MODEL=openai/gpt-4o"
+      - "OPENAI_API_KEY=${ceo.apiKey || ''}"
+      - "TELEGRAM_BOT_TOKEN=${ceo.telegramToken || ''}"
+      - "USER_ID=${companyId}"
+      - "OPENCLAW_GATEWAY_TOKEN=${companyId}_master_token"
+      - "PUBLIC_IP=\${PUBLIC_IP:-localhost}"
     volumes:
       - ./:/root/.openclaw
       - ./workspace:/root/.openclaw/workspace
