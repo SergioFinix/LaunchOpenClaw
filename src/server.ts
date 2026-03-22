@@ -402,43 +402,50 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         const cli = `docker exec -e OPENCLAW_GATEWAY_TOKEN=${gatewayToken} ${containerName} node dist/index.js`;
 
         let initialized = false;
-        for (let i = 0; i < 20; i++) {
+        console.log(`   [Link] Iniciando sondeo de binario (30 reintentos)...`);
+        for (let i = 0; i < 30; i++) {
             await new Promise(r => setTimeout(r, 2000));
             try {
+                // Probamos con la ruta absoluta por si acaso
                 await execPromise(`${cli} --version`);
                 initialized = true;
+                console.log(`   ✅ Binario detectado y autorizado.`);
                 break;
-            } catch (e) {
-                if (i === 0) console.log("   [Link] Esperando al binario de OpenClaw...");
+            } catch (e: any) {
+                if (i % 5 === 0) console.log(`   [Link] Intento ${i+1}/30: Esperando a OpenClaw...`);
+                // No logueamos todos los errores para no inundar, pero guardamos el último
             }
         }
 
-        if (initialized) {
-            try {
-                const modelStr = mainAgent.model || 'gpt-4o';
-                const isAnthropic = modelStr.toLowerCase().includes('claude') || modelStr.toLowerCase().includes('anthropic');
-                const provider = isAnthropic ? 'anthropic' : 'openai';
-                const fullModel = `${provider}/${modelStr.replace(`${provider}/`, '')}`;
+        if (!initialized) {
+            console.warn("⚠️ Tiempo de espera agotado, pero intentaremos continuar...");
+        }
 
-                console.log(`   [CLI] Sanando configuración (Doctor)...`);
-                await execPromise(`${cli} doctor --fix --yes 2>&1 || true`);
+        // 6. PASOS FINALES DE CONFIGURACIÓN
+        try {
+            const modelStr = mainAgent.model || 'gpt-4o';
+            const isAnthropic = modelStr.toLowerCase().includes('claude') || modelStr.toLowerCase().includes('anthropic');
+            const provider = isAnthropic ? 'anthropic' : 'openai';
+            const fullModel = `${provider}/${modelStr.replace(`${provider}/`, '')}`;
 
-                console.log(`   [CLI] Configurando modelo ${fullModel}...`);
-                await execPromise(`${cli} config set agents.defaults.model ${fullModel} 2>&1`);
+            console.log(`   [CLI] Sanando configuración (Doctor)...`);
+            await execPromise(`${cli} doctor --fix --yes 2>&1 || true`);
 
-                // La API Key ya se pasa por variable de entorno (OPENAI_API_KEY) en docker-compose,
-                // no es necesario el comando 'auth add' que ha cambiado en esta versión.
+            console.log(`   [CLI] Configurando modelo ${fullModel}...`);
+            await execPromise(`${cli} config set agents.defaults.model ${fullModel} 2>&1`);
 
-                for (const dept of departments) {
-                    const role = dept.role.toLowerCase();
-                    console.log(`   [CLI] Registrando sub-agente: ${role}...`);
-                    // Intentamos la sintaxis moderna: agents add [role] [path]
-                    // Si falla, al menos no detiene el proceso principal
-                    await execPromise(`${cli} agents add ${role} agents/${role} --force 2>&1 || ${cli} agents add ${role} --force 2>&1`).catch(() => {});
-                }
-            } catch (e: any) {
-                console.warn(`⚠️ Error detallado en CLI: ${e.stdout || e.message}`);
+            // La API Key ya se pasa por variable de entorno (OPENAI_API_KEY) en docker-compose,
+            // no es necesario el comando 'auth add' que ha cambiado en esta versión.
+
+            for (const dept of departments) {
+                const role = dept.role.toLowerCase();
+                console.log(`   [CLI] Registrando sub-agente: ${role}...`);
+                // Intentamos la sintaxis moderna: agents add [role] [path]
+                // Si falla, al menos no detiene el proceso principal
+                await execPromise(`${cli} agents add ${role} agents/${role} --force 2>&1 || ${cli} agents add ${role} --force 2>&1`).catch(() => {});
             }
+        } catch (e: any) {
+            console.warn(`⚠️ Error detallado en CLI: ${e.stdout || e.message}`);
         }
 
         const agentUrl = `http://${publicIp}:${port}/#token=${gatewayToken}`;
