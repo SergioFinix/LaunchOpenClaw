@@ -81,9 +81,9 @@ app.post('/api/agents', async (req: Request, res: Response): Promise<any> => {
             }
         });
 
-        if (stderr && stderr.toLowerCase().includes('error')) {
-            console.error("Docker error:", stderr);
-        }
+        if (stdout) console.log(`[Docker Out]: ${stdout}`);
+        if (stderr) console.warn(`[Docker Warn/Err]: ${stderr}`);
+        console.log(`✅ Comando Docker completado para ${userId}`);
 
         // --- AUTOMATIZACIÓN ---
 
