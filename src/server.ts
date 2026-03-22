@@ -300,7 +300,7 @@ ${agent.soul ? `\nInstrucciones adicionales de personalidad: ${agent.soul}` : 'A
  * NO creamos un config previo para evitar que el CLI muera por esquemas inválidos. 
  * El CLI creará uno nuevo válido al correr.
  */
-async function setupInitialConfig(companyDir: string, token: string, model: string, ceoPort: number) {
+async function setupInitialConfig(companyDir: string, token: string, model: string, ceoPort: number, ceoExternalPort: number) {
     const configPath = path.join(companyDir, 'openclaw.json');
     const initialConfig = {
         gateway: {
@@ -330,8 +330,8 @@ net.createServer(c => {
     const client = net.createConnection({ port: 18789, host: '127.0.0.1' });
     client.on('error', () => {});
     c.pipe(client).pipe(c);
-}).listen(${ceoPort}, '0.0.0.0', () => {
-    console.log('[Master Proxy] Escuchando en 0.0.0.0:${ceoPort} -> redirigiendo a 127.0.0.1:18789');
+}).listen(ceoExternalPort, '0.0.0.0', () => {
+    console.log('[Master Proxy] Escuchando en 0.0.0.0:${ceoExternalPort} -> redirigiendo a 127.0.0.1:${ceoPort}');
 });
 `;
     await fs.writeFile(proxyPath, proxyCode);
@@ -377,7 +377,8 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         // 2. PRE-INYECCIÓN DE CONFIGURACIÓN (Garantiza acceso por Token al nacer)
         const gatewayToken = `${companyId.toLowerCase()}_master_token`;
         const defaultModel = `openai/gpt-4o`;
-        await setupInitialConfig(companyBaseDir, gatewayToken, defaultModel, port);
+        const ceoExternalPort = port + 100;
+        await setupInitialConfig(companyBaseDir, gatewayToken, defaultModel, port, ceoExternalPort);
 
         // PARCHE DE PERMISOS FINAL
         try { await execPromise(`sudo chown -R 1000:1000 "${companyBaseDir}"`); } catch (e) {}
@@ -471,12 +472,12 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
             console.warn(`⚠️ Error detallado en CLI: ${e.stdout || e.message}`);
         }
 
-        const agentUrl = `http://${publicIp}:${port}/#token=${gatewayToken}`;
+        const agentUrl = `http://${publicIp}:${ceoExternalPort}/#token=${gatewayToken}`;
         
         return res.status(200).json({
             success: true,
             companyId,
-            port,
+            port: ceoExternalPort,
             token: gatewayToken,
             url: agentUrl,
             roles: ['ceo', ...departments.map(d => d.role.toLowerCase())],
