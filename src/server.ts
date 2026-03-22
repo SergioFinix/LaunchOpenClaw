@@ -352,15 +352,33 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
 
         // 4. LANZAR INSTANCIA (PHASE 2)
         const publicIp = process.env.PUBLIC_IP || 'localhost';
-        const containerName = `oc-${companyId}`;
-        const command = `docker-compose -f ${path.join(companyBaseDir, 'docker-compose.yml')} -p oc-${companyId} up -d`;
+        
+        // NORMALIZACIÓN: Docker Compose suele forzar minúsculas en los nombres de proyecto/contenedor
+        const containerName = `oc-${companyId.toLowerCase()}`;
+        const projectName = `oc-${companyId.toLowerCase()}`;
+        const command = `docker-compose -f ${path.join(companyBaseDir, 'docker-compose.yml')} -p ${projectName} up -d`;
         
         console.log(`🐳 Lanzando Instancia Empresarial: ${companyId}...`);
         await execPromise(command, { env: { ...process.env, PUBLIC_IP: publicIp } });
 
-        // 5. CONFIGURACIÓN VÍA CLI (POST-START)
-        // Esperamos 5 segundos a que el contenedor esté listo
-        setTimeout(async () => {
+        // 5. CONFIGURACIÓN Y ESPERA DE TOKEN (SYNC)
+        console.log(`⏳ Esperando inicialización de ${containerName} (Model: ${mainAgent.model || 'gpt-4o'})...`);
+        
+        // Esperar a que el binario de OpenClaw esté listo para recibir comandos CLI (Max 30s)
+        let initialized = false;
+        for (let i = 0; i < 15; i++) {
+            await new Promise(r => setTimeout(r, 2000));
+            try {
+                // Probamos si responde el help
+                await execPromise(`docker exec ${containerName} openclaw --version`);
+                initialized = true;
+                break;
+            } catch (e) {
+                if (i === 0) console.log("   [Link] El contenedor está arrancando, esperando al binario...");
+            }
+        }
+
+        if (initialized) {
             try {
                 const modelStr = mainAgent.model || 'gpt-4o';
                 const isAnthropic = modelStr.toLowerCase().includes('claude') || modelStr.toLowerCase().includes('anthropic');
@@ -378,21 +396,39 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
                 for (const dept of departments) {
                     const role = dept.role.toLowerCase();
                     console.log(`   [CLI] Registrando sub-agente: ${role}...`);
+                    // Usamos --force para evitar problemas si ya existía rastro
                     await execPromise(`docker exec ${containerName} openclaw agents add ${role} --path agents/${role}`);
                 }
-                
-                console.log(`✅ Configuración CLI completada para ${companyId}.`);
             } catch (e: any) {
                 console.warn(`⚠️ Error en configuración CLI: ${e.message}`);
             }
-        }, 5000);
+        }
 
+        // 6. Obtener el token del dashboard para entrada directa
+        let token = "";
+        console.log(`🔑 Obteniendo token de acceso para ${companyId}...`);
+        for (let i = 0; i < 10; i++) {
+            try {
+                const { stdout: tokenOut } = await execPromise(`docker exec -e NODE_OPTIONS="--max-old-space-size=1024" ${containerName} node dist/index.js dashboard --no-open`);
+                const match = tokenOut.match(/#token=([a-f0-9]+)/);
+                if (match && match[1]) {
+                    token = match[1];
+                    break;
+                }
+            } catch (e) {}
+            await new Promise(r => setTimeout(r, 2000));
+        }
+
+        const agentUrl = `http://${publicIp}:${port}/#token=${token}`;
+        
         return res.status(200).json({
             success: true,
             companyId,
-            url: `http://${publicIp}:${port}/`,
+            port,
+            token,
+            url: agentUrl,
             roles: ['ceo', ...departments.map(d => d.role.toLowerCase())],
-            message: `Consolidated Instance for ${companyId} is online and configuring in background.`
+            message: `Enterprise Instance for ${companyId} is READY and fully configured.`
         });
 
     } catch (error: any) {
