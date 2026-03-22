@@ -303,10 +303,6 @@ ${agent.soul ? `\nInstrucciones adicionales de personalidad: ${agent.soul}` : 'A
 async function setupInitialConfig(companyDir: string, token: string, model: string) {
     const configPath = path.join(companyDir, 'openclaw.json');
     const initialConfig = {
-        meta: {
-            title: `OpenClaw Enterprise - ${path.basename(companyDir)}`,
-            lastTouchedAt: new Date().toISOString()
-        },
         gateway: {
             auth: {
                 token: token
