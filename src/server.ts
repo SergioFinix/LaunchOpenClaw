@@ -190,7 +190,7 @@ app.post('/api/agents/approve', async (req: Request, res: Response): Promise<any
 
     try {
         const containerName = `openclaw-agent-${userId}`;
-        const listCommand = `docker exec -e NODE_OPTIONS="--max-old-space-size=256" ${containerName} openclaw devices list --json`;
+        const listCommand = `docker exec -e NODE_OPTIONS="--max-old-space-size=512" ${containerName} openclaw devices list --json`;
         const { stdout } = await (execPromise(listCommand, { timeout: 10000 }) as any);
 
         const devices = JSON.parse(stdout);
@@ -200,7 +200,7 @@ app.post('/api/agents/approve', async (req: Request, res: Response): Promise<any
 
         const approvals = [];
         for (const device of devices.pending) {
-            const approveCommand = `docker exec -e NODE_OPTIONS="--max-old-space-size=256" ${containerName} openclaw devices approve ${device.requestId}`;
+            const approveCommand = `docker exec -e NODE_OPTIONS="--max-old-space-size=512" ${containerName} openclaw devices approve ${device.requestId}`;
             await (execPromise(approveCommand, { timeout: 10000 }) as any);
             approvals.push(device.requestId);
         }
