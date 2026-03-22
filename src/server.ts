@@ -300,7 +300,7 @@ ${agent.soul ? `\nInstrucciones adicionales de personalidad: ${agent.soul}` : 'A
  * NO creamos un config previo para evitar que el CLI muera por esquemas inválidos. 
  * El CLI creará uno nuevo válido al correr.
  */
-async function setupInitialConfig(companyDir: string, token: string, model: string) {
+async function setupInitialConfig(companyDir: string, token: string, model: string, ceoPort: number) {
     const configPath = path.join(companyDir, 'openclaw.json');
     const initialConfig = {
         gateway: {
@@ -327,14 +327,15 @@ const net = require('net');
 console.log('[Master Proxy] Iniciando puente TCP...');
 net.createServer(c => {
     c.on('error', () => {});
-    const client = net.createConnection(18789, '127.0.0.1');
+    const client = net.createConnection({ port: 18789, host: '127.0.0.1' });
     client.on('error', () => {});
     c.pipe(client).pipe(c);
-}).listen(18790, '0.0.0.0', () => {
-    console.log('[Master Proxy] Escuchando en 0.0.0.0:18790 -> redirigiendo a 127.0.0.1:18789');
+}).listen(${ceoPort}, '0.0.0.0', () => {
+    console.log('[Master Proxy] Escuchando en 0.0.0.0:${ceoPort} -> redirigiendo a 127.0.0.1:18789');
 });
 `;
     await fs.writeFile(proxyPath, proxyCode);
+
 }
 
 // --- PHASE 1: ENTERPRISE ORCHESTRATOR ---
@@ -376,7 +377,7 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         // 2. PRE-INYECCIÓN DE CONFIGURACIÓN (Garantiza acceso por Token al nacer)
         const gatewayToken = `${companyId.toLowerCase()}_master_token`;
         const defaultModel = `openai/gpt-4o`;
-        await setupInitialConfig(companyBaseDir, gatewayToken, defaultModel);
+        await setupInitialConfig(companyBaseDir, gatewayToken, defaultModel, port);
 
         // PARCHE DE PERMISOS FINAL
         try { await execPromise(`sudo chown -R 1000:1000 "${companyBaseDir}"`); } catch (e) {}
