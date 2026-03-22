@@ -278,10 +278,18 @@ Este documento guía tu comportamiento estratégico de largo plazo.
     await fs.writeFile(path.join(workspaceDir, 'MEMORY.md'), memoryContent);
 
     // 2. Inyectar Alma (SOUL.md)
+    // Inyectamos la capacidad de orquestación si es el CEO
+    const orchestrationPrompt = isMaster ? `
+## Orchestration Capabilities
+You are the Master Orchestrator (CEO). You have the native ability to manage sub-agents.
+To delegate tasks, use the sub-agents tools or the command: /subagents spawn [role] [task].
+You must coordinate with your departments to fulfill the company's objective.
+` : '';
+
     const soulContent = `# 🎭 Identidad del Agente
 Rol: ${role}
 Empresa: ${companyId}
-
+${orchestrationPrompt}
 Propósito: Tu objetivo es servir a la misión de ${companyId} desde tu especialidad en ${role}. 
 ${agent.soul ? `\nInstrucciones adicionales de personalidad: ${agent.soul}` : 'Actúa con profesionalismo y proactividad.'}
 `;
@@ -306,7 +314,10 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
         },
         agents: {
             defaults: {
-                model: model
+                model: model,
+                subagents: {
+                    model: "openai/gpt-4o-mini" // Requisito: Modelo eficiente para sub-agentes
+                }
             }
         }
     };
