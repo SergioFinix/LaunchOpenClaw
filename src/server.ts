@@ -290,32 +290,47 @@ ${agent.soul ? `\nInstrucciones adicionales de personalidad: ${agent.soul}` : 'A
 }
 
 /**
- * Parchea el openclaw.json para registrar los sub-agentes locales
+ * Parchea el openclaw.json para registrar los sub-agentes locales y configurar el modelo
  */
-async function patchOpenClawConfig(companyBaseDir: string, departments: AgentConfig[]) {
+async function patchOpenClawConfig(companyBaseDir: string, departments: AgentConfig[], mainAgent: AgentConfig) {
     const configPath = path.join(companyBaseDir, '.openclaw', 'openclaw.json');
-    let config: any = {
-        agents: {}
-    };
-
+    const authPath = path.join(companyBaseDir, '.openclaw', 'agents/main/agent/auth-profiles.json');
+    
+    let config: any = { agents: {}, gateway: { host: "0.0.0.0" } };
     try {
         const existing = await fs.readFile(configPath, 'utf8');
         config = JSON.parse(existing);
-    } catch (e) {
-        // Si no existe, usamos el base
-    }
+    } catch (e) {}
 
     if (!config.agents) config.agents = {};
 
-    // Registrar cada departamento como un sub-agente local
+    // 1. Configurar Model/Provider principal
+    // Forzamos OpenAI por defecto como pidió el usuario
+    const modelStr = mainAgent.model || 'gpt-4o';
+    const isAnthropic = modelStr.toLowerCase().includes('claude') || modelStr.toLowerCase().includes('anthropic');
+    const provider = isAnthropic ? 'anthropic' : 'openai';
+    
+    config.provider = provider;
+    config.model = modelStr;
+
+    // 2. Registrar cada departamento
     for (const dept of departments) {
         const role = dept.role.toLowerCase();
-        config.agents[role] = {
-            path: `agents/${role}` // Ruta relativa dentro de .openclaw/
-        };
+        config.agents[role] = { path: `agents/${role}` };
     }
 
     await fs.writeFile(configPath, JSON.stringify(config, null, 2));
+
+    // 3. Crear Perfil de Autenticación si hay API Key
+    if (mainAgent.apiKey) {
+        const authConfig = {
+            [provider]: {
+                apiKey: mainAgent.apiKey
+            }
+        };
+        await fs.mkdir(path.dirname(authPath), { recursive: true });
+        await fs.writeFile(authPath, JSON.stringify(authConfig, null, 2));
+    }
 }
 
 // --- PHASE 1: ENTERPRISE ORCHESTRATOR ---
@@ -354,8 +369,8 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
             await injectAgentContext(deptDir, companyId, role, plandeempresa, dept);
         }
 
-        // 2. REGISTRO DE SUB-AGENTES (openclaw.json)
-        await patchOpenClawConfig(companyBaseDir, departments);
+        // 2. REGISTRO DE SUB-AGENTES Y MODELO (openclaw.json)
+        await patchOpenClawConfig(companyBaseDir, departments, mainAgent);
 
         // PARCHE DE PERMISOS FINAL
         try { await execPromise(`sudo chown -R 1000:1000 "${companyBaseDir}"`); } catch (e) {}
