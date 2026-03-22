@@ -307,6 +307,9 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
             mode: "local",
             auth: {
                 token: token
+            },
+            controlUi: {
+                allowedOrigins: ["*"]
             }
         },
         agents: {
