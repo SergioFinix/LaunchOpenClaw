@@ -64,6 +64,7 @@ services:
             data.gateway.mode = 'local';
             data.gateway.controlUi = data.gateway.controlUi || {};
             data.gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback = true;
+            data.gateway.controlUi.dmPolicy = 'none';
             
             // LIMPIEZA: Eliminar claves que causaron errores en versiones anteriores
             delete data.gateway.dmPolicy;
