@@ -40,7 +40,7 @@ services:
         
         if [ -z \"$$(ls -A $${CONFIG_DIR})\" ]; then
           echo '=> First time setup: running OpenClaw onboard in non-interactive mode...'
-          node dist/index.js onboard --non-interactive --mode local --auth-choice openai-api-key --openai-api-key \"$${OPENAI_API_KEY}\" --gateway-port 18789 --gateway-bind lan --accept-risk --skip-health
+          NODE_OPTIONS=\"--max-old-space-size=1024\" node dist/index.js onboard --non-interactive --mode local --auth-choice openai-api-key --openai-api-key \"$${OPENAI_API_KEY}\" --gateway-port 18789 --gateway-bind lan --accept-risk --skip-health
         else
           echo '=> Config exists, skipping onboard...'
         fi &&
@@ -89,5 +89,5 @@ services:
         \" &&
         
         echo '=> Starting OpenClaw gateway...' &&
-        node dist/index.js gateway
+        node dist/index.js gateway --mode local
       "
