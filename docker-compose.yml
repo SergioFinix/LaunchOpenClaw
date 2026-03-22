@@ -11,6 +11,8 @@ services:
     privileged: true
     cap_add:
       - ALL
+    init: true
+    pids_limit: 1000
     ports:
       # Mapeo del puerto de la máquina (generado por la API) al 18789 del contenedor
       - "${HOST_PORT}:18789"
@@ -93,7 +95,12 @@ services:
           }
         \" &&
         
-        echo '=> Starting OpenClaw gateway (Node Version: $(node -v))...' &&
-        free -m &&
-        node dist/index.js gateway
+        echo '=> Starting OpenClaw gateway...' &&
+        node dist/index.js gateway;
+        STATUS=$$?;
+        echo \"=> Gateway exited with status: $$STATUS\";
+        if [ $$STATUS -gt 128 ]; then
+          SIGNAL=$$(($$STATUS - 128));
+          echo \"=> Gateway was terminated by SIGNAL: $$SIGNAL (9=SIGKILL, 11=SIGSEGV)\";
+        fi
       "
