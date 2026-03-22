@@ -292,11 +292,25 @@ ${agent.soul ? `\nInstrucciones adicionales de personalidad: ${agent.soul}` : 'A
  * NO creamos un config previo para evitar que el CLI muera por esquemas inválidos. 
  * El CLI creará uno nuevo válido al correr.
  */
-async function clearInitialConfig(companyBaseDir: string) {
-    const configPath = path.join(companyBaseDir, 'openclaw.json');
-    try {
-        await fs.unlink(configPath);
-    } catch (e) {}
+async function setupInitialConfig(companyDir: string, token: string, model: string) {
+    const configPath = path.join(companyDir, 'openclaw.json');
+    const initialConfig = {
+        meta: {
+            title: `OpenClaw Enterprise - ${path.basename(companyDir)}`,
+            lastTouchedAt: new Date().toISOString()
+        },
+        gateway: {
+            auth: {
+                token: token
+            }
+        },
+        agents: {
+            defaults: {
+                model: model
+            }
+        }
+    };
+    await fs.writeFile(configPath, JSON.stringify(initialConfig, null, 2));
 }
 
 // --- PHASE 1: ENTERPRISE ORCHESTRATOR ---
@@ -335,8 +349,10 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
             await injectAgentContext(deptDir, companyId, role, plandeempresa, dept);
         }
 
-        // 2. LIMPIEZA DE CONFIGURACIÓN PREVIA (Evita errores de esquema)
-        await clearInitialConfig(companyBaseDir);
+        // 2. PRE-INYECCIÓN DE CONFIGURACIÓN (Garantiza acceso por Token al nacer)
+        const gatewayToken = `${companyId.toLowerCase()}_master_token`;
+        const defaultModel = `openai/gpt-4o`;
+        await setupInitialConfig(companyBaseDir, gatewayToken, defaultModel);
 
         // PARCHE DE PERMISOS FINAL
         try { await execPromise(`sudo chown -R 1000:1000 "${companyBaseDir}"`); } catch (e) {}
@@ -371,8 +387,7 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         // 5. CONFIGURACIÓN Y ESPERA DE TOKEN (SYNC)
         console.log(`⏳ Esperando inicialización de ${containerName}...`);
         
-        // El binario base y el token fijo
-        const gatewayToken = `${companyId.toLowerCase()}_master_token`;
+        // El binario base y el token fijo (ya definido arriba)
         const cli = `docker exec -e OPENCLAW_GATEWAY_TOKEN=${gatewayToken} ${containerName} node dist/index.js`;
 
         let initialized = false;
