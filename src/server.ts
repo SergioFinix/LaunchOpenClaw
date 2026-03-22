@@ -399,10 +399,8 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
                 console.log(`   [CLI] Configurando modelo ${fullModel}...`);
                 await execPromise(`${cli} config set agents.defaults.model ${fullModel} 2>&1`);
 
-                if (ceoWithMetadata.apiKey) {
-                    console.log(`   [CLI] Configurando API Key para ${provider}...`);
-                    await execPromise(`${cli} auth add ${provider} '${ceoWithMetadata.apiKey}' 2>&1`);
-                }
+                // La API Key ya se pasa por variable de entorno (OPENAI_API_KEY) en docker-compose,
+                // no es necesario el comando 'auth add' que ha cambiado en esta versión.
 
                 for (const dept of departments) {
                     const role = dept.role.toLowerCase();
