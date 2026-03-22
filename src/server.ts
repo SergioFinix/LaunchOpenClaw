@@ -354,20 +354,18 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         const projectName = `oc-${companyId.toLowerCase()}`;
         const command = `docker-compose -f ${path.join(companyBaseDir, 'docker-compose.yml')} -p ${projectName} up -d`;
         
-        console.log(`🐳 Lanzando Instancia Empresarial: ${companyId}...`);
-        await execPromise(command, { env: { ...process.env, PUBLIC_IP: publicIp } });
-
         // 5. CONFIGURACIÓN Y ESPERA DE TOKEN (SYNC)
         console.log(`⏳ Esperando inicialización de ${containerName}...`);
         
-        // El binario base
-        const cli = "node dist/index.js";
+        // El binario base y el token fijo
+        const gatewayToken = `${companyId.toLowerCase()}_master_token`;
+        const cli = `docker exec -e OPENCLAW_GATEWAY_TOKEN=${gatewayToken} ${containerName} node dist/index.js`;
 
         let initialized = false;
         for (let i = 0; i < 20; i++) {
             await new Promise(r => setTimeout(r, 2000));
             try {
-                await execPromise(`docker exec ${containerName} ${cli} --version`);
+                await execPromise(`${cli} --version`);
                 initialized = true;
                 break;
             } catch (e) {
@@ -380,56 +378,39 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
                 const modelStr = mainAgent.model || 'gpt-4o';
                 const isAnthropic = modelStr.toLowerCase().includes('claude') || modelStr.toLowerCase().includes('anthropic');
                 const provider = isAnthropic ? 'anthropic' : 'openai';
-                const fullModel = `${provider}/${modelStr.replace(`${provider}/`, '')}`; // Evitar duplicar provider/provider/model
+                const fullModel = `${provider}/${modelStr.replace(`${provider}/`, '')}`;
 
                 console.log(`   [CLI] Sanando configuración (Doctor)...`);
-                await execPromise(`docker exec ${containerName} ${cli} doctor --fix --yes 2>&1 || true`);
+                await execPromise(`${cli} doctor --fix --yes 2>&1 || true`);
 
                 console.log(`   [CLI] Configurando modelo ${fullModel}...`);
-                // En las nuevas versiones, el provider se incluye en el string del modelo: provider/model
-                await execPromise(`docker exec ${containerName} ${cli} config set agents.defaults.model ${fullModel} 2>&1`);
+                await execPromise(`${cli} config set agents.defaults.model ${fullModel} 2>&1`);
 
                 if (ceoWithMetadata.apiKey) {
                     console.log(`   [CLI] Configurando API Key para ${provider}...`);
-                    // Usamos comillas simples para evitar expansión de variables del sub-shell
-                    await execPromise(`docker exec ${containerName} ${cli} auth add ${provider} '${ceoWithMetadata.apiKey}' 2>&1`);
+                    await execPromise(`${cli} auth add ${provider} '${ceoWithMetadata.apiKey}' 2>&1`);
                 }
 
                 for (const dept of departments) {
                     const role = dept.role.toLowerCase();
                     console.log(`   [CLI] Registrando sub-agente: ${role}...`);
-                    await execPromise(`docker exec ${containerName} ${cli} agents add ${role} --path agents/${role} --force 2>&1`);
+                    await execPromise(`${cli} agents add ${role} --path agents/${role} --force 2>&1`);
                 }
             } catch (e: any) {
                 console.warn(`⚠️ Error detallado en CLI: ${e.stdout || e.message}`);
             }
         }
 
-        // 6. Obtener el token del dashboard
-        let token = "";
-        console.log(`🔑 Obteniendo acceso para ${companyId}...`);
-        for (let i = 0; i < 15; i++) {
-            try {
-                const { stdout: tokenOut } = await execPromise(`docker exec ${containerName} ${cli} dashboard --no-open`);
-                const match = tokenOut.match(/#token=([a-f0-9]+)/);
-                if (match && match[1]) {
-                    token = match[1];
-                    break;
-                }
-            } catch (e) {}
-            await new Promise(r => setTimeout(r, 2000));
-        }
-
-        const agentUrl = `http://${publicIp}:${port}/#token=${token}`;
+        const agentUrl = `http://${publicIp}:${port}/#token=${gatewayToken}`;
         
         return res.status(200).json({
             success: true,
             companyId,
             port,
-            token,
+            token: gatewayToken,
             url: agentUrl,
             roles: ['ceo', ...departments.map(d => d.role.toLowerCase())],
-            message: `Enterprise Instance for ${companyId} is READY and fully configured.`
+            message: `Enterprise Instance for ${companyId} is READY and fully synchronized.`
         });
 
     } catch (error: any) {

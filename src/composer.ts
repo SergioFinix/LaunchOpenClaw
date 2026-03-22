@@ -24,9 +24,11 @@ export const generateCompanyCompose = (companyId: string, agents: any[]): string
       - OPENCLAW_MODE=local
       - OPENCLAW_GATEWAY_MODE=local
       - OPENCLAW_GATEWAY_HOST=0.0.0.0
+      - OPENCLAW_AGENTS_DEFAULTS_MODEL=openai/gpt-4o
       - OPENAI_API_KEY=${ceo.apiKey || ''}
       - TELEGRAM_BOT_TOKEN=${ceo.telegramToken || ''}
       - USER_ID=${companyId}
+      - OPENCLAW_GATEWAY_TOKEN=${companyId}_master_token
       - PUBLIC_IP=\${PUBLIC_IP:-localhost}
     volumes:
       - ./:/root/.openclaw
