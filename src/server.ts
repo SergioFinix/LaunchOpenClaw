@@ -52,6 +52,10 @@ app.post('/api/agents', async (req: Request, res: Response): Promise<any> => {
         // 2. Crear directorios
         await fs.mkdir(agentDir, { recursive: true });
         await fs.mkdir(workspaceDir, { recursive: true });
+        
+        // FORZAR CREACIÓN DE DIRECTORIOS INTERNOS PARA EVITAR EACCES
+        // Algunos binarios de OpenClaw intentan crear esta ruta aun en modo local
+        await fs.mkdir(path.join(agentDir, 'agents/main/agent'), { recursive: true });
 
         // PARCHE DE PERMISOS: Asegurar que el usuario 'node' (1000) pueda escribir
         try {
