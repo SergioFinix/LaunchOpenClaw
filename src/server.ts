@@ -354,6 +354,9 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         const projectName = `oc-${companyId.toLowerCase()}`;
         const command = `docker-compose -f ${path.join(companyBaseDir, 'docker-compose.yml')} -p ${projectName} up -d`;
         
+        console.log(`🐳 Lanzando Instancia Empresarial: ${companyId}...`);
+        await execPromise(command, { env: { ...process.env, PUBLIC_IP: publicIp } });
+
         // 5. CONFIGURACIÓN Y ESPERA DE TOKEN (SYNC)
         console.log(`⏳ Esperando inicialización de ${containerName}...`);
         
