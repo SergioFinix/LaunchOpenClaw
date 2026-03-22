@@ -31,6 +31,8 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - TZ=America/Mexico_City
       - TERM=xterm-256color
+      - OPENCLAW_MODE=local
+      - OPENCLAW_GATEWAY_MODE=local
       - BROWSER=echo # Desactiva el auto-open de pestañas de navegador dentro del contenedor
     restart: unless-stopped
     # Eliminamos límites para que el VPS maneje la RAM libremente
@@ -96,6 +98,8 @@ services:
           }
         \" &&
         
+        echo '=> Verifying final configuration:' &&
+        cat $${CONFIG_DIR}/openclaw.json &&
         echo '=> Starting OpenClaw gateway...' &&
         node dist/index.js gateway;
         STATUS=$$?;
