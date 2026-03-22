@@ -330,8 +330,8 @@ net.createServer(c => {
     const client = net.createConnection({ port: 18789, host: '127.0.0.1' });
     client.on('error', () => {});
     c.pipe(client).pipe(c);
-}).listen(ceoExternalPort, '0.0.0.0', () => {
-    console.log('[Master Proxy] Escuchando en 0.0.0.0:${ceoExternalPort} -> redirigiendo a 127.0.0.1:${ceoPort}');
+}).listen(${ceoExternalPort}, '0.0.0.0', () => {
+    console.log('[Master Proxy] Escuchando en 0.0.0.0:' + ${ceoExternalPort} + ' -> redirigiendo a 127.0.0.1:' + ${ceoPort});
 });
 `;
     await fs.writeFile(proxyPath, proxyCode);
