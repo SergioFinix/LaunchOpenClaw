@@ -309,7 +309,9 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
                 token: token
             },
             controlUi: {
-                allowedOrigins: ["*"]
+                allowedOrigins: ["*"],
+                allowInsecureAuth: true,
+                dangerouslyDisableDeviceAuth: true
             }
         },
         agents: {
