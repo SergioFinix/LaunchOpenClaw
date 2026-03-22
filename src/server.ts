@@ -133,9 +133,11 @@ app.post('/api/agents', async (req: Request, res: Response): Promise<any> => {
                         await (execPromise(`docker exec -e NODE_OPTIONS="--max-old-space-size=1024" openclaw-agent-${uid} openclaw pairing approve telegram ${req.code}`, { timeout: 10000 }) as any);
                     }
                 } catch (e: any) {
-                    // Solo loguear si no es un error de "no tal contenedor" o similar esperado al inicio
-                    if (!e.message.includes("No such container") && !e.message.includes("ETIMEDOUT")) {
-                        console.error(`[AutoApprove ${uid}] Error: ${e.message}`);
+                    // Ignorar errores durante los primeros 60 segundos (Fase de arranque/onboard)
+                    if (attempts > 4) {
+                        if (!e.message.includes("No such container") && !e.message.includes("ETIMEDOUT")) {
+                            console.warn(`[AutoApprove ${uid}] Esperando que el binario esté listo...`);
+                        }
                     }
                 }
             }, 15000);
