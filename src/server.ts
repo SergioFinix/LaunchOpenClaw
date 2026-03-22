@@ -390,7 +390,8 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
 
                 if (ceoWithMetadata.apiKey) {
                     console.log(`   [CLI] Configurando API Key para ${provider}...`);
-                    await execPromise(`docker exec ${containerName} ${cli} auth add ${provider} ${ceoWithMetadata.apiKey} 2>&1`);
+                    // Usamos comillas simples para evitar expansión de variables del sub-shell
+                    await execPromise(`docker exec ${containerName} ${cli} auth add ${provider} '${ceoWithMetadata.apiKey}' 2>&1`);
                 }
 
                 for (const dept of departments) {
