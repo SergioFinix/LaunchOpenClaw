@@ -406,7 +406,9 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
                 for (const dept of departments) {
                     const role = dept.role.toLowerCase();
                     console.log(`   [CLI] Registrando sub-agente: ${role}...`);
-                    await execPromise(`${cli} agents add ${role} --path agents/${role} --force 2>&1`);
+                    // Intentamos la sintaxis moderna: agents add [role] [path]
+                    // Si falla, al menos no detiene el proceso principal
+                    await execPromise(`${cli} agents add ${role} agents/${role} --force 2>&1 || ${cli} agents add ${role} --force 2>&1`).catch(() => {});
                 }
             } catch (e: any) {
                 console.warn(`⚠️ Error detallado en CLI: ${e.stdout || e.message}`);
