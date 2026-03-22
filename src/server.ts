@@ -290,17 +290,14 @@ ${agent.soul ? `\nInstrucciones adicionales de personalidad: ${agent.soul}` : 'A
 }
 
 /**
- * Parchea el openclaw.json con lo mínimo necesario para arrancar el gateway
+ * NO creamos un config previo para evitar que el CLI muera por esquemas inválidos. 
+ * El CLI creará uno nuevo válido al correr.
  */
-async function prepareMinimalConfig(companyBaseDir: string) {
+async function clearInitialConfig(companyBaseDir: string) {
     const configPath = path.join(companyBaseDir, 'openclaw.json');
-    const config = {
-        gateway: {
-            host: "0.0.0.0",
-            port: 18789
-        }
-    };
-    await fs.writeFile(configPath, JSON.stringify(config, null, 2));
+    try {
+        await fs.unlink(configPath);
+    } catch (e) {}
 }
 
 // --- PHASE 1: ENTERPRISE ORCHESTRATOR ---
@@ -322,7 +319,7 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         const companyBaseDir = path.resolve(__dirname, `../data/agents/${companyId}`);
         const port = await getFreePort(18789);
 
-        // 1. PREPARACIÓN DE DIRECTORIOS
+        // 1. PREPARACIÓN DE DIRECTORIOS Y ADN (PHASE 3)
         // El companyBaseDir ya mapea a /root/.openclaw dentro de Docker
         await fs.mkdir(path.join(companyBaseDir, 'agents/main/agent'), { recursive: true });
         
@@ -339,8 +336,8 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
             await injectAgentContext(deptDir, companyId, role, plandeempresa, dept);
         }
 
-        // 2. CONFIGURACIÓN MÍNIMA
-        await prepareMinimalConfig(companyBaseDir);
+        // 2. LIMPIEZA DE CONFIGURACIÓN PREVIA (Evita errores de esquema)
+        await clearInitialConfig(companyBaseDir);
 
         // PARCHE DE PERMISOS FINAL
         try { await execPromise(`sudo chown -R 1000:1000 "${companyBaseDir}"`); } catch (e) {}
@@ -353,7 +350,6 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         // 4. LANZAR INSTANCIA (PHASE 2)
         const publicIp = process.env.PUBLIC_IP || 'localhost';
         
-        // NORMALIZACIÓN: Docker Compose suele forzar minúsculas en los nombres de proyecto/contenedor
         const containerName = `oc-${companyId.toLowerCase()}`;
         const projectName = `oc-${companyId.toLowerCase()}`;
         const command = `docker-compose -f ${path.join(companyBaseDir, 'docker-compose.yml')} -p ${projectName} up -d`;
@@ -362,19 +358,20 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         await execPromise(command, { env: { ...process.env, PUBLIC_IP: publicIp } });
 
         // 5. CONFIGURACIÓN Y ESPERA DE TOKEN (SYNC)
-        console.log(`⏳ Esperando inicialización de ${containerName} (Model: ${mainAgent.model || 'gpt-4o'})...`);
+        console.log(`⏳ Esperando inicialización de ${containerName}...`);
         
-        // Esperar a que el binario de OpenClaw esté listo para recibir comandos CLI (Max 30s)
+        // El binario base
+        const cli = "node dist/index.js";
+
         let initialized = false;
-        for (let i = 0; i < 15; i++) {
+        for (let i = 0; i < 20; i++) {
             await new Promise(r => setTimeout(r, 2000));
             try {
-                // Probamos si responde el help
-                await execPromise(`docker exec ${containerName} openclaw --version`);
+                await execPromise(`docker exec ${containerName} ${cli} --version`);
                 initialized = true;
                 break;
             } catch (e) {
-                if (i === 0) console.log("   [Link] El contenedor está arrancando, esperando al binario...");
+                if (i === 0) console.log("   [Link] Esperando al binario de OpenClaw...");
             }
         }
 
@@ -384,32 +381,34 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
                 const isAnthropic = modelStr.toLowerCase().includes('claude') || modelStr.toLowerCase().includes('anthropic');
                 const provider = isAnthropic ? 'anthropic' : 'openai';
 
+                console.log(`   [CLI] Sanando configuración (Doctor)...`);
+                await execPromise(`docker exec ${containerName} ${cli} doctor --fix --yes 2>&1 || true`);
+
                 console.log(`   [CLI] Configurando modelo ${modelStr}...`);
-                await execPromise(`docker exec ${containerName} openclaw config set agent.provider ${provider}`);
-                await execPromise(`docker exec ${containerName} openclaw config set agent.model ${modelStr}`);
+                await execPromise(`docker exec ${containerName} ${cli} config set agent.provider ${provider} 2>&1`);
+                await execPromise(`docker exec ${containerName} ${cli} config set agent.model ${modelStr} 2>&1`);
 
                 if (ceoWithMetadata.apiKey) {
                     console.log(`   [CLI] Configurando API Key para ${provider}...`);
-                    await execPromise(`docker exec ${containerName} openclaw auth add ${provider} ${ceoWithMetadata.apiKey}`);
+                    await execPromise(`docker exec ${containerName} ${cli} auth add ${provider} ${ceoWithMetadata.apiKey} 2>&1`);
                 }
 
                 for (const dept of departments) {
                     const role = dept.role.toLowerCase();
                     console.log(`   [CLI] Registrando sub-agente: ${role}...`);
-                    // Usamos --force para evitar problemas si ya existía rastro
-                    await execPromise(`docker exec ${containerName} openclaw agents add ${role} --path agents/${role}`);
+                    await execPromise(`docker exec ${containerName} ${cli} agents add ${role} --path agents/${role} --force 2>&1`);
                 }
             } catch (e: any) {
-                console.warn(`⚠️ Error en configuración CLI: ${e.message}`);
+                console.warn(`⚠️ Error detallado en CLI: ${e.stdout || e.message}`);
             }
         }
 
-        // 6. Obtener el token del dashboard para entrada directa
+        // 6. Obtener el token del dashboard
         let token = "";
-        console.log(`🔑 Obteniendo token de acceso para ${companyId}...`);
-        for (let i = 0; i < 10; i++) {
+        console.log(`🔑 Obteniendo acceso para ${companyId}...`);
+        for (let i = 0; i < 15; i++) {
             try {
-                const { stdout: tokenOut } = await execPromise(`docker exec -e NODE_OPTIONS="--max-old-space-size=1024" ${containerName} node dist/index.js dashboard --no-open`);
+                const { stdout: tokenOut } = await execPromise(`docker exec ${containerName} ${cli} dashboard --no-open`);
                 const match = tokenOut.match(/#token=([a-f0-9]+)/);
                 if (match && match[1]) {
                     token = match[1];
