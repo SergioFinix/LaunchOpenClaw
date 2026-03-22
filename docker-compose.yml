@@ -15,7 +15,7 @@ services:
       - ./workspace:/workspace
     environment:
       - NODE_ENV=production
-      - NODE_OPTIONS=--max-old-space-size=1536
+      - NODE_OPTIONS=--max-old-space-size=2048
       # Inyectar variables para el parche de seguridad de Origen y Telegram
       - USER_ID=${USER_ID}
       - HOST_PORT=${HOST_PORT}
@@ -31,7 +31,7 @@ services:
       resources:
         limits:
           cpus: '2.0'
-          memory: 2500M
+          memory: 3500M
     healthcheck:
       disable: true
     command: >
