@@ -261,9 +261,10 @@ app.post('/api/agents/approve', async (req: Request, res: Response): Promise<any
 });
 
 // --- PHASE 3: DNA INJECTION HELPERS ---
-async function injectAgentContext(agentDir: string, companyId: string, role: string, businessPlan: string, agent: AgentConfig) {
+async function injectAgentContext(agentDir: string, companyId: string, role: string, businessPlan: string, agent: AgentConfig, isMaster: boolean = false) {
     const workspaceDir = path.join(agentDir, 'workspace');
-    
+    await fs.mkdir(workspaceDir, { recursive: true });
+
     // 1. Inyectar ADN Empresarial (MEMORY.md)
     const memoryContent = `# 🏢 Alineación Estratégica: ${companyId.toUpperCase()}
 Misión Global: ${businessPlan}
@@ -271,6 +272,7 @@ Misión Global: ${businessPlan}
 # 🧬 Tu Rol en el Cluster
 Eres el agente especializado en: **${role.toUpperCase()}**.
 Prioridad de recursos: ${agent.priority || 'low'}.
+${isMaster ? '\nEres el CEO y Orquestador de este cluster empresarial.' : ''}
 
 Este documento guía tu comportamiento estratégico de largo plazo.
 `;
@@ -285,12 +287,35 @@ Propósito: Tu objetivo es servir a la misión de ${companyId} desde tu especial
 ${agent.soul ? `\nInstrucciones adicionales de personalidad: ${agent.soul}` : 'Actúa con profesionalismo y proactividad.'}
 `;
     await fs.writeFile(path.join(workspaceDir, 'SOUL.md'), soulContent);
+}
 
-    // 3. Preparar AGENTS.md (soul/identity principal)
-    const agentsMdContent = `Nombre: ${role}_${companyId}
-Descripción: Agente de ${role} para el cluster ${companyId}.
-`;
-    await fs.writeFile(path.join(workspaceDir, 'AGENTS.md'), agentsMdContent);
+/**
+ * Parchea el openclaw.json para registrar los sub-agentes locales
+ */
+async function patchOpenClawConfig(companyBaseDir: string, departments: AgentConfig[]) {
+    const configPath = path.join(companyBaseDir, '.openclaw', 'openclaw.json');
+    let config: any = {
+        agents: {}
+    };
+
+    try {
+        const existing = await fs.readFile(configPath, 'utf8');
+        config = JSON.parse(existing);
+    } catch (e) {
+        // Si no existe, usamos el base
+    }
+
+    if (!config.agents) config.agents = {};
+
+    // Registrar cada departamento como un sub-agente local
+    for (const dept of departments) {
+        const role = dept.role.toLowerCase();
+        config.agents[role] = {
+            path: `agents/${role}` // Ruta relativa dentro de .openclaw/
+        };
+    }
+
+    await fs.writeFile(configPath, JSON.stringify(config, null, 2));
 }
 
 // --- PHASE 1: ENTERPRISE ORCHESTRATOR ---
@@ -307,77 +332,52 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
     }
 
     try {
-        console.log(`🏗️  Iniciando creación de Empresa: ${companyId}...`);
+        console.log(`🏗️  Creando Instancia Consolidada: ${companyId}...`);
         
-        // Unificar CEO y departamentos en una lista de agentes a crear
-        const allAgents: AgentConfig[] = [
-            { 
-                ...mainAgent, 
-                role: 'ceo', 
-                apiKey: mainAgent.apiKey || llmApiKey || process.env.OPENAI_API_KEY 
-            }, 
-            ...departments.map(d => ({
-                ...d,
-                apiKey: d.apiKey || llmApiKey || process.env.OPENAI_API_KEY
-            }))
-        ];
+        const companyBaseDir = path.resolve(__dirname, `../data/agents/${companyId}`);
+        const masterAgentDir = path.join(companyBaseDir, '.openclaw');
+        const port = await getFreePort(18789);
 
-        const provisionedAgents = [];
+        // 1. PREPARACIÓN DE DIRECTORIOS
+        await fs.mkdir(path.join(masterAgentDir, 'agents/main/agent'), { recursive: true });
+        
+        // CEO Agent (Master)
+        await injectAgentContext(masterAgentDir, companyId, 'ceo', plandeempresa, mainAgent, true);
 
-        for (const agent of allAgents) {
-            const role = agent.role.toLowerCase();
-            const port = await getFreePort(18789 + provisionedAgents.length);
+        // Departamentos (Sub-folders internos)
+        for (const dept of departments) {
+            const role = dept.role.toLowerCase();
+            const deptDir = path.join(masterAgentDir, 'agents', role);
+            await fs.mkdir(path.join(deptDir, 'agent'), { recursive: true });
             
-            // Ruta jerárquica: data/agents/COMPANY/ROLE
-            const agentBaseDir = path.resolve(__dirname, `../data/agents/${companyId}/${role}`);
-            
-            console.log(`   [${role}] Preparando en puerto ${port}...`);
-            await fs.mkdir(path.join(agentBaseDir, '.openclaw/agents/main/agent'), { recursive: true });
-            await fs.mkdir(path.join(agentBaseDir, 'workspace'), { recursive: true });
-
-            // PARCHE DE PERMISOS
-            try { await execPromise(`sudo chown -R 1000:1000 "${agentBaseDir}"`); } catch (e) {}
-
-            // 1. Inyectar Contexto Estratégico (PHASE 3)
-            await injectAgentContext(agentBaseDir, companyId, role, plandeempresa, agent);
-            
-            provisionedAgents.push({
-                ...agent,
-                role,
-                port,
-                telegramToken: role === 'ceo' ? telegramToken : ''
-            });
+            console.log(`   [${role}] Inyectando ADN en sub-carpeta...`);
+            await injectAgentContext(deptDir, companyId, role, plandeempresa, dept);
         }
 
-        // 2. GENERAR Y GUARDAR DOCKER-COMPOSE.YML (PHASE 2)
-        const companyBaseDir = path.resolve(__dirname, `../data/agents/${companyId}`);
-        const composeYaml = generateCompanyCompose(companyId, provisionedAgents);
+        // 2. REGISTRO DE SUB-AGENTES (openclaw.json)
+        await patchOpenClawConfig(companyBaseDir, departments);
+
+        // PARCHE DE PERMISOS FINAL
+        try { await execPromise(`sudo chown -R 1000:1000 "${companyBaseDir}"`); } catch (e) {}
+
+        // 3. GENERAR DOCKER-COMPOSE.YML (PHASE 2)
+        const ceoWithMetadata = { ...mainAgent, role: 'ceo', port, telegramToken, apiKey: mainAgent.apiKey || llmApiKey || process.env.OPENAI_API_KEY };
+        const composeYaml = generateCompanyCompose(companyId, [ceoWithMetadata]);
         await fs.writeFile(path.join(companyBaseDir, 'docker-compose.yml'), composeYaml);
 
-        // 3. LANZAR CLUSTER (PHASE 2)
+        // 4. LANZAR INSTANCIA (PHASE 2)
         const publicIp = process.env.PUBLIC_IP || 'localhost';
-        const command = `docker-compose -f ${path.join(companyBaseDir, 'docker-compose.yml')} -p cluster-${companyId} up -d`;
+        const command = `docker-compose -f ${path.join(companyBaseDir, 'docker-compose.yml')} -p oc-${companyId} up -d`;
         
-        console.log(`🐳 Lanzando cluster empresarial: ${companyId}...`);
-        const { stdout, stderr } = await execPromise(command, { 
-            env: { ...process.env, PUBLIC_IP: publicIp } 
-        });
-
-        if (stdout) console.log(`[Docker Cluster Out]: ${stdout}`);
-        if (stderr) console.warn(`[Docker Cluster Warn]: ${stderr}`);
-
-        // 4. PREPARAR RESPUESTA
-        const agentsWithUrls = provisionedAgents.map(a => ({
-            role: a.role,
-            port: a.port,
-            url: `http://${publicIp}:${a.port}/`
-        }));
+        console.log(`🐳 Lanzando Instancia Empresarial: ${companyId} en puerto ${port}...`);
+        await execPromise(command, { env: { ...process.env, PUBLIC_IP: publicIp } });
 
         return res.status(200).json({
             success: true,
             companyId,
-            agents: agentsWithUrls,
-            message: `Phase 2 Complete: Cluster ${companyId} is online with ${agentsWithUrls.length} services.`
+            url: `http://${publicIp}:${port}/`,
+            roles: ['ceo', ...departments.map(d => d.role.toLowerCase())],
+            message: `Consolidated Instance for ${companyId} is online.`
         });
 
     } catch (error: any) {

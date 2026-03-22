@@ -1,46 +1,40 @@
 import { AgentConfig } from './server';
 
 export const generateCompanyCompose = (companyId: string, agents: any[]): string => {
-    let services = '';
+    // Tomamos la configuración del CEO (siempre el primero) para los puertos y tokens globales
+    const ceo = agents.find(a => a.role === 'ceo') || agents[0];
+    
+    // Asignamos recursos robustos para una instancia que manejará múltiples sub-agentes
+    const memLimit = '2560m'; // 2.5GB de RAM
+    const cpuLimit = '1.5';
 
-    for (const agent of agents) {
-        const memLimit = agent.priority === 'high' ? '1024m' : '512m';
-        const cpuLimit = agent.priority === 'high' ? '1.0' : '0.5';
-        
-        // El puerto interno de OpenClaw siempre es 18789
-        // El puerto externo es el que asignó el Maestro dinámicamente
-        services += `
-  ${agent.role}:
+    return `services:
+  main:
     image: ghcr.io/openclaw/openclaw:latest
-    container_name: oc-${companyId}-${agent.role}
+    container_name: oc-${companyId}
     user: "0:0"
     shm_size: '512mb'
     privileged: true
     init: true
     network_mode: bridge
     ports:
-      - "${agent.port}:18789"
+      - "${ceo.port}:18789"
     environment:
-      - NODE_OPTIONS=--max-old-space-size=${agent.priority === 'high' ? 1024 : 512}
+      - NODE_OPTIONS=--max-old-space-size=2048
       - OPENCLAW_MODE=local
       - OPENCLAW_GATEWAY_MODE=local
-      - OPENAI_API_KEY=${agent.apiKey || ''}
-      - TELEGRAM_BOT_TOKEN=${agent.telegramToken || ''}
-      - USER_ID=${companyId}-${agent.role}
+      - OPENAI_API_KEY=${ceo.apiKey || ''}
+      - TELEGRAM_BOT_TOKEN=${ceo.telegramToken || ''}
+      - USER_ID=${companyId}
       - PUBLIC_IP=\${PUBLIC_IP:-localhost}
     volumes:
-      - ./${agent.role}/.openclaw:/root/.openclaw
-      - ./${agent.role}/workspace:/root/.openclaw/workspace
+      - ./:/root/.openclaw
+      - ./workspace:/root/.openclaw/workspace
     deploy:
       resources:
         limits:
           memory: ${memLimit}
           cpus: '${cpuLimit}'
     restart: always
-`;
-    }
-
-    return `services:
-${services}
 `;
 };
