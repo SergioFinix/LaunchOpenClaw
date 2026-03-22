@@ -89,5 +89,5 @@ services:
         \" &&
         
         echo '=> Starting OpenClaw gateway...' &&
-        node dist/index.js gateway --mode local
+        node dist/index.js gateway
       "

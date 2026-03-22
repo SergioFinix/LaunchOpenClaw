@@ -184,6 +184,31 @@ app.get('/api/agents/:userId/token', async (req: Request, res: Response): Promis
 });
 
 // Nuevo endpoint: Aprobar dispositivo pendiente (Opción 1 de Seguridad)
+app.get('/api/agents/:userId/status', async (req: Request, res: Response): Promise<any> => {
+    const { userId } = req.params;
+    const containerName = `openclaw-agent-${userId}`;
+
+    try {
+        // 1. Verificar si el contenedor existe y está corriendo
+        const { stdout: psOut } = await execPromise(`docker ps -q --filter "name=${containerName}"`);
+        if (!psOut.trim()) {
+            return res.status(200).json({ success: true, status: 'starting', token: '' });
+        }
+
+        // 2. Intentar obtener el token del dashboard
+        const { stdout: tokenOut } = await execPromise(`docker exec -e NODE_OPTIONS="--max-old-space-size=1024" ${containerName} node dist/index.js dashboard --no-open`);
+        const match = tokenOut.match(/#token=([a-f0-9]+)/);
+        
+        if (match && match[1]) {
+            return res.status(200).json({ success: true, status: 'ready', token: match[1] });
+        }
+
+        return res.status(200).json({ success: true, status: 'onboarding', token: '' });
+    } catch (e) {
+        return res.status(200).json({ success: true, status: 'initializing', token: '' });
+    }
+});
+
 app.post('/api/agents/approve', async (req: Request, res: Response): Promise<any> => {
     const { userId } = req.body;
     if (typeof userId !== 'string' || !/^[a-zA-Z0-9]+$/.test(userId)) return res.status(400).json({ success: false, error: "Invalid userId" });
