@@ -424,8 +424,17 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
             const provider = isAnthropic ? 'anthropic' : 'openai';
             const fullModel = `${provider}/${modelStr.replace(`${provider}/`, '')}`;
 
+            // DIAGNÓSTICO PROFUNDO: Verificamos Variables de Entorno Reales
+            console.log(`   [Discovery] Verificando variables de entorno en contenedor...`);
+            const { stdout: containerEnv } = await execPromise(`docker exec ${containerName} env | grep -E "HOST|ADDRESS|MODE" || true`);
+            console.log(`   [Discovery Env]:\n${containerEnv}`);
+
             console.log(`   [CLI] Sanando configuración (Doctor)...`);
             await execPromise(`${cli} doctor --fix --yes 2>&1 || true`);
+
+            // Intento de Binding Forzado (Probamos 'address' que es común en v2026)
+            console.log(`   [CLI] Intentando forzar binding a 0.0.0.0...`);
+            await execPromise(`${cli} config set gateway.address 0.0.0.0 2>&1 || ${cli} config set gateway.listen 0.0.0.0 2>&1 || true`);
 
             console.log(`   [CLI] Configurando modelo ${fullModel}...`);
             await execPromise(`${cli} config set agents.defaults.model ${fullModel} 2>&1`);
