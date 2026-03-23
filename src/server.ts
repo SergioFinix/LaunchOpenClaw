@@ -435,7 +435,7 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         console.log(`⏳ Esperando inicialización de ${containerName}...`);
         
         // El binario base y el token fijo (ya definido arriba)
-        const cli = `docker exec -e OPENCLAW_GATEWAY_TOKEN=${gatewayToken} ${containerName} node dist/index.js`;
+        const cli = `docker exec -e OPENCLAW_GATEWAY_TOKEN=${gatewayToken} ${containerName} node openclaw.mjs`;
 
         let initialized = false;
         console.log(`   [Link] Iniciando sondeo de binario (30 reintentos)...`);
