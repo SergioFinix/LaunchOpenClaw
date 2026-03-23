@@ -462,8 +462,8 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         let ready = false;
         if (initialized) {
             console.log(`   [Link] Paso 2: Verificando respuesta HTTP en puerto ${port}...`);
-            // Usamos un timeout total de 60s adicionales para el puerto
-            for (let j = 0; j < 30; j++) {
+            // Usamos un timeout total de 120s adicionales para el puerto (Total 4 min standby)
+            for (let j = 0; j < 60; j++) {
                 try {
                     // Consultamos el puerto local del host
                     const { stdout: curlOut } = await execPromise(`curl -I http://localhost:${port}`);
