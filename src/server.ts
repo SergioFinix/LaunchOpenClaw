@@ -438,27 +438,49 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         // 5. CONFIGURACIÓN Y ESPERA DE TOKEN (SYNC)
         console.log(`⏳ Esperando inicialización de ${containerName}...`);
         
-        // El binario base y el token fijo (ya definido arriba)
         const cli = `docker exec -e OPENCLAW_GATEWAY_TOKEN=${gatewayToken} ${containerName} node openclaw.mjs`;
 
         let initialized = false;
-        console.log(`   [Link] Iniciando sondeo de binario (30 reintentos)...`);
-        for (let i = 0; i < 30; i++) {
+        console.log(`   [Link] Paso 1: Sondeo de binario (60 reintentos)...`);
+        for (let i = 0; i < 60; i++) {
             await new Promise(r => setTimeout(r, 2000));
             try {
-                // Probamos con la ruta absoluta por si acaso
                 await execPromise(`${cli} --version`);
                 initialized = true;
-                console.log(`   ✅ Binario detectado y autorizado.`);
+                console.log(`   ✅ Binario detectado.`);
                 break;
             } catch (e: any) {
-                if (i % 5 === 0) console.log(`   [Link] Intento ${i+1}/30: Esperando a OpenClaw...`);
-                // No logueamos todos los errores para no inundar, pero guardamos el último
+                if (i % 5 === 0) console.log(`   [Link] Intento ${i+1}/60: Esperando a OpenClaw...`);
             }
         }
 
         if (!initialized) {
-            console.warn("⚠️ Tiempo de espera agotado, pero intentaremos continuar...");
+            console.warn("⚠️ Tiempo de espera de binario agotado.");
+        }
+
+        // 5.5 VERIFICACIÓN DE RESPUESTA HTTP (PROOF OF LIFE)
+        let ready = false;
+        if (initialized) {
+            console.log(`   [Link] Paso 2: Verificando respuesta HTTP en puerto ${port}...`);
+            // Usamos un timeout total de 60s adicionales para el puerto
+            for (let j = 0; j < 30; j++) {
+                try {
+                    // Consultamos el puerto local del host
+                    const { stdout: curlOut } = await execPromise(`curl -I http://localhost:${port}`);
+                    if (curlOut.includes("200 OK") || curlOut.includes("101 Switching Protocols") || curlOut.includes("HTTP/")) {
+                        ready = true;
+                        console.log(`   🚀 ¡Dashboard Activo y Respondiendo!`);
+                        // Un pequeño margen de 3s para asegurar que los WebSockets internos estén bindeados
+                        await new Promise(r => setTimeout(r, 3000));
+                        break;
+                    }
+                } catch (e) {}
+                await new Promise(r => setTimeout(r, 2000));
+            }
+        }
+
+        if (!ready) {
+            console.warn("⚠️ El dashboard no respondió a tiempo, el link podría tardar unos segundos más.");
         }
 
         // 6. PASOS FINALES DE CONFIGURACIÓN
