@@ -330,7 +330,8 @@ server.listen(18889, '0.0.0.0');`;
             },
             controlUi: {
                 allowInsecureAuth: true,
-                dangerouslyDisableDeviceAuth: true
+                dangerouslyDisableDeviceAuth: true,
+                allowedOrigins: ["*"]
             }
         },
         channels: {
