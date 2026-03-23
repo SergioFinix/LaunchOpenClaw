@@ -522,7 +522,6 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
                 } catch (e: any) {
                     // Ignorar errores silenciosamente mientras el binario arranca o si hay timeout
                 }
-                
                 // PROGRAMAR EL SIGUIENTE POLL SOLO DESPUÉS DE QUE ESTE TERMINE COMPLETAMENTE
                 setTimeout(poll, 5000); 
             };
@@ -533,24 +532,65 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         if (telegramToken && telegramToken.trim() !== '') {
             startEnterpriseAutoApprove(companyId);
         }
-        // ------------------------------------------------------------
-        
-        return res.status(200).json({
+
+        res.json({
             success: true,
             companyId,
-            port: ceoExternalPort,
             token: gatewayToken,
-            url: agentUrl,
-            roles: ['ceo', ...departments.map(d => d.role.toLowerCase())],
-            message: `Enterprise Instance for ${companyId} is READY and fully synchronized.`
+            url: `http://${process.env.PUBLIC_IP || 'localhost'}:${ceoExternalPort}/#token=${gatewayToken}`
         });
 
     } catch (error: any) {
-        console.error("Error en Phase 1 (Enterprise):", error);
-        return res.status(500).json({ success: false, error: error.message });
+        console.error("Error creating company:", error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`🚀 Master Server corriendo en http://localhost:${PORT}`);
+
+/**
+ * GLOBAL WATCHER: Escanea TODOS los contenedores activos oc-* en busca de peticiones de Telegram.
+ * Esto asegura que la auto-aprobación sobreviva a reinicios del Maestro.
+ */
+async function startGlobalTelegramWatcher() {
+    console.log("ðŸ‘ ï¸  Iniciando Vigilante Global de Telegram (Inmortal)...");
+    
+    const runCycle = async () => {
+        try {
+            // Listar contenedores que empiezan por oc- y están corriendo
+            const { stdout: containersList } = await execPromise(`docker ps --format "{{.Names}}" --filter "name=oc-"`);
+            const containers = containersList.split('\n').filter(name => name.trim().startsWith('oc-'));
+
+            for (const container of containers) {
+                try {
+                    // Obtener el Token del entorno del contenedor
+                    const { stdout: envOut } = await execPromise(`docker exec ${container} env | grep TELEGRAM_BOT_TOKEN`);
+                    const tokenMatch = envOut.match(/TELEGRAM_BOT_TOKEN=(.+)/);
+                    if (!tokenMatch) continue;
+                    const botToken = tokenMatch[1].trim();
+
+                    // Consultar emparejamientos pendientes
+                    const { stdout: tgListOut = "" } = await (execPromise(`docker exec -e TELEGRAM_BOT_TOKEN=${botToken} -e NODE_OPTIONS="--max-old-space-size=256" ${container} openclaw pairing list telegram --json`, { timeout: 10000 }) as any);
+                    const tgRequests = JSON.parse(tgListOut);
+                    
+                    for (const req of (tgRequests.requests || [])) {
+                        console.log(`[GlobalWatch] Auto-Aprobando para ${container}: ${req.code} (@${req.meta?.username})`);
+                        await execPromise(`docker exec -e TELEGRAM_BOT_TOKEN=${botToken} -e NODE_OPTIONS="--max-old-space-size=256" ${container} openclaw pairing approve telegram ${req.code}`);
+                    }
+                } catch (e) {
+                    // Error en un contenedor específico, continuar con el siguiente
+                }
+            }
+        } catch (e) {
+            console.error("[GlobalWatch] Error en ciclo de vigilancia:", e);
+        }
+        
+        setTimeout(runCycle, 20000); // Escanear todo el cluster cada 20 segundos
+    };
+
+    runCycle();
+}
+
+const PORT = Number(process.env.PORT) || 3000;
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`ðŸš€ Master Server corriendo en http://0.0.0.0:${PORT}`);
+    startGlobalTelegramWatcher();
 });
