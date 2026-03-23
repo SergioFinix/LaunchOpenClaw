@@ -335,16 +335,16 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
         },
         agents: {
             defaults: {
-                model: model || "openai/gpt-4o"
+                model: model.includes('/') ? model : `openai/${model}`
             },
             list: [
                 ...departments.map(dept => ({
                     id: dept.role,
-                    model: dept.model || "openai/gpt-4o-mini"
+                    model: dept.model?.includes('/') ? dept.model : `openai/${dept.model || 'gpt-4o-mini'}`
                 })),
                 {
                     id: "main",
-                    model: model || "openai/gpt-4o"
+                    model: model.includes('/') ? model : `openai/${model}`
                 }
             ]
         }
