@@ -335,12 +335,14 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
         },
         agents: {
             defaults: {
-                model: model || "openai/gpt-4o",
-                subagents: {
-                    model: "openai/gpt-4o-mini"
-                }
+                model: model || "openai/gpt-4o"
             },
-            ...agentsConfig
+            list: {
+                ...agentsConfig,
+                main: {
+                    model: model || "openai/gpt-4o"
+                }
+            }
         }
     };
     await fs.writeFile(configPath, JSON.stringify(initialConfig, null, 2));
@@ -349,14 +351,14 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
     const proxyPath = path.join(companyDir, 'proxy.js');
     const proxyCode = `
 const net = require('net');
-console.log('[Master Proxy] Iniciando puente TCP...');
+console.log('[Master Proxy] Iniciando puente TCP en puerto fijo 18889...');
 net.createServer(c => {
     c.on('error', () => {});
     const client = net.createConnection({ port: ${ceoPort}, host: '127.0.0.1' });
     client.on('error', () => {});
     c.pipe(client).pipe(c);
-}).listen(${ceoExternalPort}, '0.0.0.0', () => {
-    console.log('[Master Proxy] Escuchando en 0.0.0.0:' + ${ceoExternalPort} + ' -> redirigiendo a 127.0.0.1:' + ${ceoPort});
+}).listen(18889, '0.0.0.0', () => {
+    console.log('[Master Proxy] Escuchando en 0.0.0.0:18889 -> redirigiendo a 127.0.0.1:' + ${ceoPort});
 });
 `;
     await fs.writeFile(proxyPath, proxyCode);
