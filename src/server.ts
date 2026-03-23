@@ -326,7 +326,7 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
         },
         agents: {
             defaults: {
-                model: model,
+                model: model || "openai/gpt-4o",
                 subagents: {
                     model: "openai/gpt-4o-mini" // Requisito: Modelo eficiente para sub-agentes
                 }
@@ -474,8 +474,8 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
             // await execPromise(`${cli} doctor --fix --yes 2>&1 || true`);
 
             // Intento de Binding Forzado (Probamos 'address' que es común en v2026)
-            console.log(`   [CLI] Configurando modelo ${fullModel}...`);
-            await execPromise(`${cli} config set agents.defaults.model ${fullModel} 2>&1`).catch(() => {});
+            // console.log(`   [CLI] Configurando modelo ${fullModel}...`);
+            // await execPromise(`${cli} config set agents.defaults.model ${fullModel} 2>&1`).catch(() => {});
 
             // La API Key ya se pasa por variable de entorno (OPENAI_API_KEY) en docker-compose,
             // no es necesario el comando 'auth add' que ha cambiado en esta versión.
