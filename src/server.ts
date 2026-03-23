@@ -72,7 +72,7 @@ app.post('/api/agents', async (req: Request, res: Response): Promise<any> => {
         // 2. Crear directorios
         await fs.mkdir(agentDir, { recursive: true });
         await fs.mkdir(workspaceDir, { recursive: true });
-        
+
         // FORZAR CREACIÓN DE DIRECTORIOS INTERNOS PARA EVITAR EACCES
         // Algunos binarios de OpenClaw intentan crear esta ruta aun en modo local
         await fs.mkdir(path.join(agentDir, 'agents/main/agent'), { recursive: true });
@@ -93,9 +93,9 @@ app.post('/api/agents', async (req: Request, res: Response): Promise<any> => {
 
         console.log(`Lanzando agente para usuario ${userId} (Telegram: ${telegramToken ? 'SÍ' : 'NO'})...`);
         const { stdout, stderr } = await execPromise(command, {
-            env: { 
-                ...process.env, 
-                USER_ID: userId, 
+            env: {
+                ...process.env,
+                USER_ID: userId,
                 HOST_PORT: port.toString(),
                 TELEGRAM_BOT_TOKEN: telegramToken || ''
             }
@@ -147,7 +147,7 @@ app.post('/api/agents', async (req: Request, res: Response): Promise<any> => {
                     const tgListCmd = `docker exec -e NODE_OPTIONS="--max-old-space-size=1024" openclaw-agent-${uid} openclaw pairing list telegram --json`;
                     const { stdout: tgListOut } = await (execPromise(tgListCmd, { timeout: 10000 }) as any);
                     const tgRequests = JSON.parse(tgListOut);
-                    
+
                     for (const req of (tgRequests.requests || [])) {
                         console.log(`Auto-aprobando Telegram para ${uid}: Code ${req.code}`);
                         await (execPromise(`docker exec -e NODE_OPTIONS="--max-old-space-size=1024" openclaw-agent-${uid} openclaw pairing approve telegram ${req.code}`, { timeout: 10000 }) as any);
@@ -220,7 +220,7 @@ app.get('/api/agents/:userId/status', async (req: Request, res: Response): Promi
         // 2. Intentar obtener el token del dashboard
         const { stdout: tokenOut } = await execPromise(`docker exec -e NODE_OPTIONS="--max-old-space-size=1024" ${containerName} node dist/index.js dashboard --no-open`);
         const match = tokenOut.match(/#token=([a-f0-9]+)/);
-        
+
         if (match && match[1]) {
             return res.status(200).json({ success: true, status: 'ready', token: match[1] });
         }
@@ -320,7 +320,7 @@ console.log('[Master Proxy] Iniciando puente TCP...');
 console.log('[Master Proxy] Escuchando en 0.0.0.0:18889 -> redirigiendo a 127.0.0.1:18789');
 server.listen(18889, '0.0.0.0');`;
     await fs.writeFile(proxyPath, proxyCode);
-    
+
     const initialConfig: any = {
         gateway: {
             mode: "local",
@@ -361,7 +361,7 @@ server.listen(18889, '0.0.0.0');`;
     try {
         console.log(`   [Firewall] Abriendo puerto host: ${port}...`);
         await execPromise(`sudo ufw allow ${port}/tcp`);
-    } catch (e) {}
+    } catch (e) { }
 }
 
 // --- PHASE 1: ENTERPRISE ORCHESTRATOR ---
@@ -380,13 +380,13 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
 
     try {
         const companyBaseDir = path.resolve(__dirname, `../data/agents/${companyId}`);
-        
+
         console.log(`🏗️  Creando Instancia Consolidada: ${companyId}...`);
-        
+
         // 1. PREPARACIÓN DE DIRECTORIOS Y ADN (PHASE 3)
         // El companyBaseDir ya mapea a /root/.openclaw dentro de Docker
         await fs.mkdir(path.join(companyBaseDir, 'agents/main/agent'), { recursive: true });
-        
+
         // CEO Agent (Master)
         await injectAgentContext(companyBaseDir, companyId, 'ceo', plandeempresa, mainAgent, true);
 
@@ -395,7 +395,7 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
             const role = dept.role.toLowerCase();
             const deptDir = path.join(companyBaseDir, '_agents', role);
             await fs.mkdir(path.join(deptDir, 'agent'), { recursive: true });
-            
+
             console.log(`   [${role}] Inyectando ADN en sub-carpeta...`);
             await injectAgentContext(deptDir, companyId, role, plandeempresa, dept);
         }
@@ -406,7 +406,7 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         await setupInitialConfig(companyBaseDir, gatewayToken, mainAgent.model || "openai/gpt-4o", port, telegramToken, departments);
 
         // PARCHE DE PERMISOS FINAL
-        try { await execPromise(`sudo chown -R 1000:1000 "${companyBaseDir}"`); } catch (e) {}
+        try { await execPromise(`sudo chown -R 1000:1000 "${companyBaseDir}"`); } catch (e) { }
 
         // 3. GENERAR DOCKER-COMPOSE.YML (PHASE 2)
         // Forzamos el uso de la llave del .env del Maestro para simplificar el CURL
@@ -417,11 +417,11 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
 
         // 4. LANZAR INSTANCIA (PHASE 2)
         const publicIp = process.env.PUBLIC_IP || 'localhost';
-        
+
         const containerName = `oc-${companyId.toLowerCase()}`;
         const projectName = `oc-${companyId.toLowerCase()}`;
         const command = `docker-compose -f ${path.join(companyBaseDir, 'docker-compose.yml')} -p ${projectName} up -d`;
-        
+
         console.log(`🐳 Lanzando Instancia Empresarial: ${companyId}...`);
         try {
             const { stdout: launchOut, stderr: launchErr } = await execPromise(command, { env: { ...process.env, PUBLIC_IP: publicIp } });
@@ -437,7 +437,7 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
 
         // 5. CONFIGURACIÓN Y ESPERA DE TOKEN (SYNC)
         console.log(`⏳ Esperando inicialización de ${containerName}...`);
-        
+
         const cli = `docker exec -e OPENCLAW_GATEWAY_TOKEN=${gatewayToken} ${containerName} node openclaw.mjs`;
 
         let initialized = false;
@@ -450,7 +450,7 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
                 console.log(`   ✅ Binario detectado.`);
                 break;
             } catch (e: any) {
-                if (i % 5 === 0) console.log(`   [Link] Intento ${i+1}/60: Esperando a OpenClaw...`);
+                if (i % 5 === 0) console.log(`   [Link] Intento ${i + 1}/60: Esperando a OpenClaw...`);
             }
         }
 
@@ -458,7 +458,7 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
             console.warn("⚠️ Tiempo de espera de binario agotado.");
         }
 
-        // 5.5 VERIFICACIÓN DE RESPUESTA HTTP (PROOF OF LIFE)
+        // 5.5 VERIFICACIÓN DE RESPUESTA HTTP (PROOF OF LIFE)...
         let ready = false;
         if (initialized) {
             console.log(`   [Link] Paso 2: Verificando respuesta HTTP en puerto ${port}...`);
@@ -474,7 +474,7 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
                         await new Promise(r => setTimeout(r, 3000));
                         break;
                     }
-                } catch (e) {}
+                } catch (e) { }
                 await new Promise(r => setTimeout(r, 2000));
             }
         }
@@ -499,7 +499,7 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         const startEnterpriseAutoApprove = (compId: string) => {
             let attempts = 0;
             const container = `oc-${compId.toLowerCase()}`;
-            
+
             const poll = async () => {
                 attempts++;
                 if (attempts > 180) return; // Detener tras 15 minutos
@@ -515,7 +515,7 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
                     const tgListCmd = `docker exec -e TELEGRAM_BOT_TOKEN=${telegramToken} -e NODE_OPTIONS="--max-old-space-size=512" ${container} openclaw pairing list telegram --json`;
                     const { stdout: tgListOut } = await (execPromise(tgListCmd, { timeout: 15000 }) as any);
                     const tgRequests = JSON.parse(tgListOut);
-                    
+
                     for (const req of (tgRequests.requests || [])) {
                         console.log(`[AutoApprove] Autenticando Telegram Empresarial para ${compId}: Code ${req.code}`);
                         await (execPromise(`docker exec -e TELEGRAM_BOT_TOKEN=${telegramToken} -e NODE_OPTIONS="--max-old-space-size=512" ${container} openclaw pairing approve telegram ${req.code}`, { timeout: 15000 }) as any);
@@ -524,7 +524,7 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
                     // Ignorar errores silenciosamente mientras el binario arranca o si hay timeout
                 }
                 // PROGRAMAR EL SIGUIENTE POLL SOLO DESPUÉS DE QUE ESTE TERMINE COMPLETAMENTE
-                setTimeout(poll, 5000); 
+                setTimeout(poll, 5000);
             };
 
             poll();
@@ -553,7 +553,7 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
  */
 async function startGlobalTelegramWatcher() {
     console.log("ðŸ‘ ï¸  Iniciando Vigilante Global de Telegram (Inmortal)...");
-    
+
     const runCycle = async () => {
         try {
             // Listar contenedores que empiezan por oc- y están corriendo
@@ -571,7 +571,7 @@ async function startGlobalTelegramWatcher() {
                     // Consultar emparejamientos pendientes
                     const { stdout: tgListOut = "" } = await (execPromise(`docker exec -e TELEGRAM_BOT_TOKEN=${botToken} -e NODE_OPTIONS="--max-old-space-size=256" ${container} openclaw pairing list telegram --json`, { timeout: 10000 }) as any);
                     const tgRequests = JSON.parse(tgListOut);
-                    
+
                     for (const req of (tgRequests.requests || [])) {
                         console.log(`[GlobalWatch] Auto-Aprobando para ${container}: ${req.code} (@${req.meta?.username})`);
                         await execPromise(`docker exec -e TELEGRAM_BOT_TOKEN=${botToken} -e NODE_OPTIONS="--max-old-space-size=256" ${container} openclaw pairing approve telegram ${req.code}`);
@@ -583,7 +583,7 @@ async function startGlobalTelegramWatcher() {
         } catch (e) {
             console.error("[GlobalWatch] Error en ciclo de vigilancia:", e);
         }
-        
+
         setTimeout(runCycle, 20000); // Escanear todo el cluster cada 20 segundos
     };
 
