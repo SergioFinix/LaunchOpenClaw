@@ -340,7 +340,7 @@ const net = require('net');
 console.log('[Master Proxy] Iniciando puente TCP...');
 net.createServer(c => {
     c.on('error', () => {});
-    const client = net.createConnection({ port: 18789, host: '127.0.0.1' });
+    const client = net.createConnection({ port: ${ceoPort}, host: '127.0.0.1' });
     client.on('error', () => {});
     c.pipe(client).pipe(c);
 }).listen(${ceoExternalPort}, '0.0.0.0', () => {
@@ -349,6 +349,11 @@ net.createServer(c => {
 `;
     await fs.writeFile(proxyPath, proxyCode);
 
+    // 2.5 ABRIR FIREWALL UFW DINÁMICAMENTE (REQUISITO: HOST NETWORKING)
+    try {
+        console.log(`   [Firewall] Abriendo puerto externo: ${ceoExternalPort}...`);
+        await execPromise(`sudo ufw allow ${ceoExternalPort}/tcp`);
+    } catch (e) {}
 }
 
 // --- PHASE 1: ENTERPRISE ORCHESTRATOR ---
