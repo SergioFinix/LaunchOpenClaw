@@ -306,7 +306,6 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
         gateway: {
             mode: "local",
             port: ceoPort,
-            address: "0.0.0.0", // Escuchar en todas las interfaces del contenedor
             auth: {
                 token: token
             },
@@ -475,9 +474,6 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
             // await execPromise(`${cli} doctor --fix --yes 2>&1 || true`);
 
             // Intento de Binding Forzado (Probamos 'address' que es común en v2026)
-            // console.log(`   [CLI] Intentando forzar binding a 0.0.0.0...`);
-            // await execPromise(`${cli} config set gateway.address 0.0.0.0 2>&1 || ${cli} config set gateway.listen 0.0.0.0 2>&1 || true`);
-
             console.log(`   [CLI] Configurando modelo ${fullModel}...`);
             await execPromise(`${cli} config set agents.defaults.model ${fullModel} 2>&1`).catch(() => {});
 
