@@ -308,6 +308,15 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
             auth: {
                 token: token
             },
+            channels: {
+                telegram: {
+                    enabled: true,
+                    dmPolicy: "pairing",
+                    // IMPORTANTE: Permitir que el bot responda en Grupos automáticamente sin requerir CLI overrides
+                    groupPolicy: "open",
+                    streaming: "partial"
+                }
+            },
             controlUi: {
                 allowedOrigins: ["*"],
                 allowInsecureAuth: true,
@@ -478,6 +487,35 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         }
 
         const agentUrl = `http://${publicIp}:${ceoExternalPort}/#token=${gatewayToken}`;
+
+        // --- BACKGROUND AUTO-APROBACIÓN DE TELEGRAM (Enterprise) ---
+        // Se ejecuta sin bloquear el Thread principal durante los primeros 15 minutos
+        const startEnterpriseAutoApprove = (compId: string) => {
+            let attempts = 0;
+            const container = `oc-${compId.toLowerCase()}`;
+            const interval = setInterval(async () => {
+                attempts++;
+                if (attempts > 180) return clearInterval(interval); // Detener tras 15 minutos (180 cortes de 5s)
+
+                try {
+                    const tgListCmd = `docker exec -e NODE_OPTIONS="--max-old-space-size=512" ${container} openclaw pairing list telegram --json`;
+                    const { stdout: tgListOut } = await (execPromise(tgListCmd, { timeout: 10000 }) as any);
+                    const tgRequests = JSON.parse(tgListOut);
+                    
+                    for (const req of (tgRequests.requests || [])) {
+                        console.log(`[AutoApprove] Autenticando Telegram Empresarial para ${compId}: Code ${req.code}`);
+                        await (execPromise(`docker exec -e NODE_OPTIONS="--max-old-space-size=512" ${container} openclaw pairing approve telegram ${req.code}`, { timeout: 10000 }) as any);
+                    }
+                } catch (e: any) {
+                    // Ignorar errores silenciosamente mientras el binario arranca
+                }
+            }, 5000); // Revisar cada 5 segundos
+        };
+
+        if (telegramToken && telegramToken.trim() !== '') {
+            startEnterpriseAutoApprove(companyId);
+        }
+        // ------------------------------------------------------------
         
         return res.status(200).json({
             success: true,
