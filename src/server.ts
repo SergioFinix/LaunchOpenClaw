@@ -467,8 +467,9 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
             const { stdout: containerEnv } = await execPromise(`docker exec ${containerName} env | grep -E "HOST|ADDRESS|MODE" || true`);
             console.log(`   [Discovery Env]:\n${containerEnv}`);
 
-            console.log(`   [CLI] Sanando configuración (Doctor)...`);
-            await execPromise(`${cli} doctor --fix --yes 2>&1 || true`);
+            // Omitimos doctor --fix ya que es muy lento y puede bloquearse en contenedores
+            // console.log(`   [CLI] Sanando configuración (Doctor)...`);
+            // await execPromise(`${cli} doctor --fix --yes 2>&1 || true`);
 
             // Intento de Binding Forzado (Probamos 'address' que es común en v2026)
             console.log(`   [CLI] Intentando forzar binding a 0.0.0.0...`);
