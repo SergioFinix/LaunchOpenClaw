@@ -305,6 +305,8 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
     const initialConfig: any = {
         gateway: {
             mode: "local",
+            port: ceoPort,
+            address: "127.0.0.1", // El Proxy TCP hará el puente a 0.0.0.0:ceoExternalPort
             auth: {
                 token: token
             },
