@@ -23,6 +23,8 @@ export const generateCompanyCompose = (companyId: string, agents: any[]): string
       - "NODE_OPTIONS=--max-old-space-size=896"
       - "OPENCLAW_MODE=local"
       - "OPENCLAW_GATEWAY_MODE=local"
+      - "OPENCLAW_GATEWAY_PORT=${ceo.port}"
+      - "PORT=${ceo.port}"
       - "OPENCLAW_AGENTS_DEFAULTS_MODEL=openai/gpt-4o"
       - "OPENAI_API_KEY=${ceo.apiKey || ''}"
       - "TELEGRAM_BOT_TOKEN=${ceo.telegramToken || ''}"
