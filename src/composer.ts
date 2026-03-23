@@ -16,7 +16,6 @@ export const generateCompanyCompose = (companyId: string, agents: any[]): string
     user: "0:0"
     shm_size: '512mb'
     init: true
-    pids_limit: 100
     ports:
       - "\${OPENCLAW_GATEWAY_PORT_HOST:-${ceo.port+100}}:18889"
     command: ["/bin/sh", "-c", "node /root/.openclaw/proxy.js & exec node openclaw.mjs gateway --allow-unconfigured"]
@@ -40,6 +39,7 @@ export const generateCompanyCompose = (companyId: string, agents: any[]): string
         limits:
           memory: ${memLimit}
           cpus: '${cpuLimit}'
+          pids: 100
     restart: always
 `;
 };
