@@ -302,11 +302,29 @@ ${agent.soul ? `\nInstrucciones adicionales de personalidad: ${agent.soul}` : 'A
  */
 async function setupInitialConfig(companyDir: string, token: string, model: string, port: number, telegramToken: string = '', departments: any[] = []) {
     const configPath = path.join(companyDir, 'openclaw.json');
+    const proxyPath = path.join(companyDir, 'proxy.js');
+
+    // 1. GENERAR PROXY TCP (PHASE 6.5)
+    // Este proxy escucha en 0.0.0.0:18889 y redirige a 127.0.0.1:18789
+    // Es vital para que el Dashboard (React) vea al servidor interno.
+    const proxyCode = `const net = require('net');
+const server = net.createServer((socket) => {
+    const client = net.connect(18789, '127.0.0.1', () => {
+        socket.pipe(client);
+        client.pipe(socket);
+    });
+    client.on('error', () => socket.destroy());
+    socket.on('error', () => client.destroy());
+});
+console.log('[Master Proxy] Iniciando puente TCP...');
+console.log('[Master Proxy] Escuchando en 0.0.0.0:18889 -> redirigiendo a 127.0.0.1:18789');
+server.listen(18889, '0.0.0.0');`;
+    await fs.writeFile(proxyPath, proxyCode);
     
     const initialConfig: any = {
         gateway: {
             mode: "local",
-            port: port,
+            port: 18789, // Interno
             auth: {
                 token: token
             },
@@ -339,7 +357,7 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
     };
     await fs.writeFile(configPath, JSON.stringify(initialConfig, null, 2));
 
-    // 2.5 ABRIR FIREWALL UFW DINÁMICAMENTE (REQUISITO: HOST NETWORKING)
+    // 2.5 ABRIR FIREWALL UFW DINÁMICAMENTE
     try {
         console.log(`   [Firewall] Abriendo puerto host: ${port}...`);
         await execPromise(`sudo ufw allow ${port}/tcp`);
