@@ -400,10 +400,10 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         // CEO Agent (Master)
         await injectAgentContext(companyBaseDir, companyId, 'ceo', plandeempresa, mainAgent, true);
 
-        // Departamentos (Sub-folders internos)
+        // Departamentos (Sub-folders internos en _agents para evitar auto-discovery recursivo)
         for (const dept of departments) {
             const role = dept.role.toLowerCase();
-            const deptDir = path.join(companyBaseDir, 'agents', role);
+            const deptDir = path.join(companyBaseDir, '_agents', role);
             await fs.mkdir(path.join(deptDir, 'agent'), { recursive: true });
             
             console.log(`   [${role}] Inyectando ADN en sub-carpeta...`);

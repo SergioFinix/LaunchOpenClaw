@@ -6,8 +6,8 @@ export const generateCompanyCompose = (companyId: string, agents: any[]): string
     
     // Asignamos recursos robustos para una instancia que manejará múltiples sub-agentes
     // Optimización de recursos para evitar Swap Thrashing en VPS de 8GB
-    const memLimit = '2048m'; // 2GB de RAM (Suficiente para Node + sub-agentes ligeros)
-    const cpuLimit = '1.2';
+    const memLimit = '4096m'; // 4GB de RAM (Hardening contra picos de sub-agentes)
+    const cpuLimit = '1.5';
 
     return `services:
   main:
@@ -16,15 +16,16 @@ export const generateCompanyCompose = (companyId: string, agents: any[]): string
     user: "0:0"
     shm_size: '512mb'
     init: true
+    pids_limit: 100
     ports:
-      - "${ceo.port+100}:18889"
+      - "\${OPENCLAW_GATEWAY_PORT_HOST:-${ceo.port+100}}:18889"
     command: ["/bin/sh", "-c", "node /root/.openclaw/proxy.js & exec node openclaw.mjs gateway --allow-unconfigured"]
     environment:
-      - "NODE_OPTIONS=--max-old-space-size=896"
+      - "NODE_OPTIONS=--max-old-space-size=1024"
       - "OPENCLAW_MODE=local"
       - "OPENCLAW_GATEWAY_MODE=local"
-      - "OPENCLAW_GATEWAY_PORT=${ceo.port}"
-      - "PORT=${ceo.port}"
+      - "OPENCLAW_GATEWAY_PORT=18789"
+      - "PORT=18789"
       - "OPENCLAW_AGENTS_DEFAULTS_MODEL=openai/gpt-4o"
       - "OPENAI_API_KEY=${ceo.apiKey || ''}"
       - "TELEGRAM_BOT_TOKEN=${ceo.telegramToken || ''}"
