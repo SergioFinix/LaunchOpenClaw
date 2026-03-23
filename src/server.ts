@@ -326,8 +326,7 @@ server.listen(18889, '0.0.0.0');`;
             mode: "local",
             port: 18789, // Interno
             auth: {
-                token: token,
-                maxFailedAttempts: 999
+                token: token
             },
             controlUi: {
                 allowInsecureAuth: true,
