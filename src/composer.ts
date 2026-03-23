@@ -16,15 +16,13 @@ export const generateCompanyCompose = (companyId: string, agents: any[]): string
     user: "0:0"
     shm_size: '1gb'
     init: true
-    ports:
-      - "\${OPENCLAW_GATEWAY_PORT_HOST:-${ceo.port+100}}:18889"
-    command: ["/bin/sh", "-c", "node /root/.openclaw/proxy.js & exec node openclaw.mjs gateway --allow-unconfigured"]
+    network_mode: host
     environment:
       - "NODE_OPTIONS=--max-old-space-size=2048"
       - "OPENCLAW_MODE=local"
       - "OPENCLAW_GATEWAY_MODE=local"
-      - "OPENCLAW_GATEWAY_PORT=18789"
-      - "PORT=18789"
+      - "OPENCLAW_GATEWAY_PORT=${ceo.port}"
+      - "PORT=${ceo.port}"
       - "OPENCLAW_AGENTS_DEFAULTS_MODEL=openai/gpt-4o"
       - "OPENAI_API_KEY=${ceo.apiKey || ''}"
       - "TELEGRAM_BOT_TOKEN=${ceo.telegramToken || ''}"
