@@ -300,9 +300,9 @@ ${agent.soul ? `\nInstrucciones adicionales de personalidad: ${agent.soul}` : 'A
  * NO creamos un config previo para evitar que el CLI muera por esquemas inválidos. 
  * El CLI creará uno nuevo válido al correr.
  */
-async function setupInitialConfig(companyDir: string, token: string, model: string, ceoPort: number, ceoExternalPort: number) {
+async function setupInitialConfig(companyDir: string, token: string, model: string, ceoPort: number, ceoExternalPort: number, telegramToken: string = '') {
     const configPath = path.join(companyDir, 'openclaw.json');
-    const initialConfig = {
+    const initialConfig: any = {
         gateway: {
             mode: "local",
             auth: {
@@ -316,7 +316,8 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
         },
         channels: {
             telegram: {
-                enabled: true,
+                enabled: telegramToken !== '',
+                botToken: telegramToken,
                 dmPolicy: "pairing",
                 groupPolicy: "open",
                 streaming: "partial"
@@ -396,7 +397,7 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         const gatewayToken = `${companyId.toLowerCase()}_master_token`;
         const defaultModel = `openai/gpt-4o`;
         const ceoExternalPort = port + 100;
-        await setupInitialConfig(companyBaseDir, gatewayToken, defaultModel, port, ceoExternalPort);
+        await setupInitialConfig(companyBaseDir, gatewayToken, defaultModel, port, ceoExternalPort, telegramToken || '');
 
         // PARCHE DE PERMISOS FINAL
         try { await execPromise(`sudo chown -R 1000:1000 "${companyBaseDir}"`); } catch (e) {}
@@ -510,13 +511,13 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
                         return;
                     }
 
-                    const tgListCmd = `docker exec -e NODE_OPTIONS="--max-old-space-size=512" ${container} openclaw pairing list telegram --json`;
+                    const tgListCmd = `docker exec -e TELEGRAM_BOT_TOKEN=${telegramToken} -e NODE_OPTIONS="--max-old-space-size=512" ${container} openclaw pairing list telegram --json`;
                     const { stdout: tgListOut } = await (execPromise(tgListCmd, { timeout: 15000 }) as any);
                     const tgRequests = JSON.parse(tgListOut);
                     
                     for (const req of (tgRequests.requests || [])) {
                         console.log(`[AutoApprove] Autenticando Telegram Empresarial para ${compId}: Code ${req.code}`);
-                        await (execPromise(`docker exec -e NODE_OPTIONS="--max-old-space-size=512" ${container} openclaw pairing approve telegram ${req.code}`, { timeout: 15000 }) as any);
+                        await (execPromise(`docker exec -e TELEGRAM_BOT_TOKEN=${telegramToken} -e NODE_OPTIONS="--max-old-space-size=512" ${container} openclaw pairing approve telegram ${req.code}`, { timeout: 15000 }) as any);
                     }
                 } catch (e: any) {
                     // Ignorar errores silenciosamente mientras el binario arranca o si hay timeout
