@@ -361,7 +361,8 @@ net.createServer(c => {
 
 // --- PHASE 1: ENTERPRISE ORCHESTRATOR ---
 app.post('/api/companies', async (req: Request, res: Response): Promise<any> => {
-    const { companyId, telegramToken, plandeempresa, mainAgent, departments } = req.body as CompanyRequest;
+    const { companyId: rawId, telegramToken, plandeempresa, mainAgent, departments } = req.body as CompanyRequest;
+    const companyId = (rawId || '').toLowerCase();
 
     // 1. Validar inputs básicos
     if (!companyId || !/^[a-zA-Z0-9_-]+$/.test(companyId)) {
