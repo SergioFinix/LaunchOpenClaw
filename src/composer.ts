@@ -5,8 +5,9 @@ export const generateCompanyCompose = (companyId: string, agents: any[]): string
     const ceo = agents.find(a => a.role === 'ceo') || agents[0];
     
     // Asignamos recursos robustos para una instancia que manejará múltiples sub-agentes
-    const memLimit = '2560m'; // 2.5GB de RAM
-    const cpuLimit = '1.5';
+    // Optimización de recursos para evitar Swap Thrashing en VPS de 8GB
+    const memLimit = '1280m'; // 1.25GB de RAM (Suficiente para Node + sub-agentes ligeros)
+    const cpuLimit = '1.2';
 
     return `services:
   main:
@@ -19,7 +20,7 @@ export const generateCompanyCompose = (companyId: string, agents: any[]): string
     network_mode: host
     command: ["/bin/sh", "-c", "node /root/.openclaw/proxy.js & exec node dist/index.js gateway"]
     environment:
-      - "NODE_OPTIONS=--max-old-space-size=2048"
+      - "NODE_OPTIONS=--max-old-space-size=896"
       - "OPENCLAW_MODE=local"
       - "OPENCLAW_GATEWAY_MODE=local"
       - "OPENCLAW_AGENTS_DEFAULTS_MODEL=openai/gpt-4o"

@@ -497,23 +497,36 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         const startEnterpriseAutoApprove = (compId: string) => {
             let attempts = 0;
             const container = `oc-${compId.toLowerCase()}`;
-            const interval = setInterval(async () => {
+            
+            const poll = async () => {
                 attempts++;
-                if (attempts > 180) return clearInterval(interval); // Detener tras 15 minutos (180 cortes de 5s)
+                if (attempts > 180) return; // Detener tras 15 minutos
 
                 try {
+                    // Verificamos si el contenedor existe y está corriendo antes de lanzar el comando pesado
+                    const { stdout: checkRunning } = await execPromise(`docker ps -q --filter name=${container}`);
+                    if (!checkRunning.trim()) {
+                        setTimeout(poll, 5000); // Reintentar en 5s si aún no arranca
+                        return;
+                    }
+
                     const tgListCmd = `docker exec -e NODE_OPTIONS="--max-old-space-size=512" ${container} openclaw pairing list telegram --json`;
-                    const { stdout: tgListOut } = await (execPromise(tgListCmd, { timeout: 10000 }) as any);
+                    const { stdout: tgListOut } = await (execPromise(tgListCmd, { timeout: 15000 }) as any);
                     const tgRequests = JSON.parse(tgListOut);
                     
                     for (const req of (tgRequests.requests || [])) {
                         console.log(`[AutoApprove] Autenticando Telegram Empresarial para ${compId}: Code ${req.code}`);
-                        await (execPromise(`docker exec -e NODE_OPTIONS="--max-old-space-size=512" ${container} openclaw pairing approve telegram ${req.code}`, { timeout: 10000 }) as any);
+                        await (execPromise(`docker exec -e NODE_OPTIONS="--max-old-space-size=512" ${container} openclaw pairing approve telegram ${req.code}`, { timeout: 15000 }) as any);
                     }
                 } catch (e: any) {
-                    // Ignorar errores silenciosamente mientras el binario arranca
+                    // Ignorar errores silenciosamente mientras el binario arranca o si hay timeout
                 }
-            }, 5000); // Revisar cada 5 segundos
+                
+                // PROGRAMAR EL SIGUIENTE POLL SOLO DESPUÉS DE QUE ESTE TERMINE COMPLETAMENTE
+                setTimeout(poll, 5000); 
+            };
+
+            poll();
         };
 
         if (telegramToken && telegramToken.trim() !== '') {
