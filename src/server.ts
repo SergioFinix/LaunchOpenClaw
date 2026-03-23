@@ -337,12 +337,16 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
             defaults: {
                 model: model || "openai/gpt-4o"
             },
-            list: {
-                ...agentsConfig,
-                main: {
+            list: [
+                ...departments.map(dept => ({
+                    id: dept.role,
+                    model: dept.model || "openai/gpt-4o-mini"
+                })),
+                {
+                    id: "main",
                     model: model || "openai/gpt-4o"
                 }
-            }
+            ]
         }
     };
     await fs.writeFile(configPath, JSON.stringify(initialConfig, null, 2));
