@@ -308,19 +308,18 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
             auth: {
                 token: token
             },
-            channels: {
-                telegram: {
-                    enabled: true,
-                    dmPolicy: "pairing",
-                    // IMPORTANTE: Permitir que el bot responda en Grupos automáticamente sin requerir CLI overrides
-                    groupPolicy: "open",
-                    streaming: "partial"
-                }
-            },
             controlUi: {
                 allowedOrigins: ["*"],
                 allowInsecureAuth: true,
                 dangerouslyDisableDeviceAuth: true
+            }
+        },
+        channels: {
+            telegram: {
+                enabled: true,
+                dmPolicy: "pairing",
+                groupPolicy: "open",
+                streaming: "partial"
             }
         },
         agents: {
