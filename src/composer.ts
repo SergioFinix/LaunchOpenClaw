@@ -16,7 +16,7 @@ export const generateCompanyCompose = (companyId: string, agents: any[]): string
     shm_size: '512mb'
     init: true
     ports:
-      - "\${OPENCLAW_GATEWAY_PORT_HOST:-${ceo.port+100}}:18889"
+      - "\${OPENCLAW_GATEWAY_PORT_HOST:-${ceo.port}}:18889"
     command: ["/bin/sh", "-c", "node /root/.openclaw/proxy.js & exec node openclaw.mjs gateway --allow-unconfigured"]
     environment:
       - "NODE_OPTIONS=--max-old-space-size=1024"
