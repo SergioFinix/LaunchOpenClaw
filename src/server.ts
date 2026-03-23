@@ -300,37 +300,25 @@ ${agent.soul ? `\nInstrucciones adicionales de personalidad: ${agent.soul}` : 'A
  * NO creamos un config previo para evitar que el CLI muera por esquemas inválidos. 
  * El CLI creará uno nuevo válido al correr.
  */
-async function setupInitialConfig(companyDir: string, token: string, model: string, ceoPort: number, ceoExternalPort: number, telegramToken: string = '', departments: any[] = []) {
+async function setupInitialConfig(companyDir: string, token: string, model: string, port: number, telegramToken: string = '', departments: any[] = []) {
     const configPath = path.join(companyDir, 'openclaw.json');
     
-    // Mapeamos los departamentos a la estructura de agentes de OpenClaw
-    const agentsConfig: any = {};
-    for (const dept of departments) {
-        agentsConfig[dept.role] = {
-            model: dept.model || "openai/gpt-4o-mini"
-        };
-    }
-
     const initialConfig: any = {
         gateway: {
             mode: "local",
-            port: ceoPort,
+            port: port,
             auth: {
                 token: token
             },
             controlUi: {
-                allowedOrigins: ["*"],
                 allowInsecureAuth: true,
                 dangerouslyDisableDeviceAuth: true
             }
         },
         channels: {
             telegram: {
-                enabled: telegramToken !== '',
-                botToken: telegramToken,
-                dmPolicy: "pairing",
-                groupPolicy: "open",
-                streaming: "partial"
+                enabled: !!telegramToken,
+                token: telegramToken
             }
         },
         agents: {
@@ -339,7 +327,7 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
             },
             list: [
                 ...departments.map(dept => ({
-                    id: dept.role,
+                    id: dept.role.toLowerCase(),
                     model: dept.model?.includes('/') ? dept.model : `openai/${dept.model || 'gpt-4o-mini'}`
                 })),
                 {
@@ -351,26 +339,10 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
     };
     await fs.writeFile(configPath, JSON.stringify(initialConfig, null, 2));
 
-    // INYECCIÓN DE PROXY TCP: Bypass maestro para el binding hardcodeado a 127.0.0.1
-    const proxyPath = path.join(companyDir, 'proxy.js');
-    const proxyCode = `
-const net = require('net');
-console.log('[Master Proxy] Iniciando puente TCP en puerto fijo 18889...');
-net.createServer(c => {
-    c.on('error', () => {});
-    const client = net.createConnection({ port: ${ceoPort}, host: '127.0.0.1' });
-    client.on('error', () => {});
-    c.pipe(client).pipe(c);
-}).listen(18889, '0.0.0.0', () => {
-    console.log('[Master Proxy] Escuchando en 0.0.0.0:18889 -> redirigiendo a 127.0.0.1:' + ${ceoPort});
-});
-`;
-    await fs.writeFile(proxyPath, proxyCode);
-
     // 2.5 ABRIR FIREWALL UFW DINÁMICAMENTE (REQUISITO: HOST NETWORKING)
     try {
-        console.log(`   [Firewall] Abriendo puerto externo: ${ceoExternalPort}...`);
-        await execPromise(`sudo ufw allow ${ceoExternalPort}/tcp`);
+        console.log(`   [Firewall] Abriendo puerto host: ${port}...`);
+        await execPromise(`sudo ufw allow ${port}/tcp`);
     } catch (e) {}
 }
 
@@ -411,10 +383,9 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         }
 
         // 2. PRE-INYECCIÓN DE CONFIGURACIÓN (Garantiza acceso por Token al nacer)
-        const port = await getFreePort(18789);
+        const port = await getFreePort(18890); // Rango superior para evitar colisiones
         const gatewayToken = `${companyId.toLowerCase()}_master_token`;
-        const ceoExternalPort = port + 100;
-        await setupInitialConfig(companyBaseDir, gatewayToken, mainAgent.model || "openai/gpt-4o", port, ceoExternalPort, telegramToken, departments);
+        await setupInitialConfig(companyBaseDir, gatewayToken, mainAgent.model || "openai/gpt-4o", port, telegramToken, departments);
 
         // PARCHE DE PERMISOS FINAL
         try { await execPromise(`sudo chown -R 1000:1000 "${companyBaseDir}"`); } catch (e) {}
@@ -481,7 +452,7 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
             console.warn(`⚠️ Error detallado en CLI: ${e.stdout || e.message}`);
         }
 
-        const agentUrl = `http://${publicIp}:${ceoExternalPort}/#token=${gatewayToken}`;
+        const agentUrl = `http://${publicIp}:${port}/#token=${gatewayToken}`;
 
         // --- BACKGROUND AUTO-APROBACIÓN DE TELEGRAM (Enterprise) ---
         // Se ejecuta sin bloquear el Thread principal durante los primeros 15 minutos
@@ -523,11 +494,11 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
             startEnterpriseAutoApprove(companyId);
         }
 
-        res.json({
+        res.status(200).json({
             success: true,
-            companyId,
+            companyId: companyId,
             token: gatewayToken,
-            url: `http://${publicIp}:${ceoExternalPort}/#token=${gatewayToken}`
+            url: `http://${publicIp}:${port}/#token=${gatewayToken}`
         });
 
     } catch (error: any) {
