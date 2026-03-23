@@ -304,7 +304,7 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
     const configPath = path.join(companyDir, 'openclaw.json');
     const proxyPath = path.join(companyDir, 'proxy.js');
 
-    // 1. GENERAR PROXY TCP (PHASE 6.5)
+    // 1. GENERAR PROXY TCP (PHASE 6.5) ...
     // Este proxy escucha en 0.0.0.0:18889 y redirige a 127.0.0.1:18789
     // Es vital para que el Dashboard (React) vea al servidor interno.
     const proxyCode = `const net = require('net');
