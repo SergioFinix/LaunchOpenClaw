@@ -300,8 +300,17 @@ ${agent.soul ? `\nInstrucciones adicionales de personalidad: ${agent.soul}` : 'A
  * NO creamos un config previo para evitar que el CLI muera por esquemas inválidos. 
  * El CLI creará uno nuevo válido al correr.
  */
-async function setupInitialConfig(companyDir: string, token: string, model: string, ceoPort: number, ceoExternalPort: number, telegramToken: string = '') {
+async function setupInitialConfig(companyDir: string, token: string, model: string, ceoPort: number, ceoExternalPort: number, telegramToken: string = '', departments: any[] = []) {
     const configPath = path.join(companyDir, 'openclaw.json');
+    
+    // Mapeamos los departamentos a la estructura de agentes de OpenClaw
+    const agentsConfig: any = {};
+    for (const dept of departments) {
+        agentsConfig[dept.role] = {
+            model: dept.model || "openai/gpt-4o-mini"
+        };
+    }
+
     const initialConfig: any = {
         gateway: {
             mode: "local",
@@ -328,9 +337,10 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
             defaults: {
                 model: model || "openai/gpt-4o",
                 subagents: {
-                    model: "openai/gpt-4o-mini" // Requisito: Modelo eficiente para sub-agentes
+                    model: "openai/gpt-4o-mini"
                 }
-            }
+            },
+            ...agentsConfig
         }
     };
     await fs.writeFile(configPath, JSON.stringify(initialConfig, null, 2));
@@ -373,11 +383,10 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
     }
 
     try {
+        const companyBaseDir = path.resolve(__dirname, `../data/agents/${companyId}`);
+        
         console.log(`🏗️  Creando Instancia Consolidada: ${companyId}...`);
         
-        const companyBaseDir = path.resolve(__dirname, `../data/agents/${companyId}`);
-        const port = await getFreePort(18789);
-
         // 1. PREPARACIÓN DE DIRECTORIOS Y ADN (PHASE 3)
         // El companyBaseDir ya mapea a /root/.openclaw dentro de Docker
         await fs.mkdir(path.join(companyBaseDir, 'agents/main/agent'), { recursive: true });
@@ -396,10 +405,10 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         }
 
         // 2. PRE-INYECCIÓN DE CONFIGURACIÓN (Garantiza acceso por Token al nacer)
+        const port = await getFreePort(18789);
         const gatewayToken = `${companyId.toLowerCase()}_master_token`;
-        const defaultModel = `openai/gpt-4o`;
         const ceoExternalPort = port + 100;
-        await setupInitialConfig(companyBaseDir, gatewayToken, defaultModel, port, ceoExternalPort, telegramToken || '');
+        await setupInitialConfig(companyBaseDir, gatewayToken, mainAgent.model || "openai/gpt-4o", port, ceoExternalPort, telegramToken, departments);
 
         // PARCHE DE PERMISOS FINAL
         try { await execPromise(`sudo chown -R 1000:1000 "${companyBaseDir}"`); } catch (e) {}
@@ -459,34 +468,9 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
 
         // 6. PASOS FINALES DE CONFIGURACIÓN
         try {
-            const modelStr = mainAgent.model || 'gpt-4o';
-            const isAnthropic = modelStr.toLowerCase().includes('claude') || modelStr.toLowerCase().includes('anthropic');
-            const provider = isAnthropic ? 'anthropic' : 'openai';
-            const fullModel = `${provider}/${modelStr.replace(`${provider}/`, '')}`;
-
-            // DIAGNÓSTICO PROFUNDO: Verificamos Variables de Entorno Reales
             console.log(`   [Discovery] Verificando variables de entorno en contenedor...`);
             const { stdout: containerEnv } = await execPromise(`docker exec ${containerName} env | grep -E "HOST|ADDRESS|MODE" || true`);
             console.log(`   [Discovery Env]:\n${containerEnv}`);
-
-            // Omitimos doctor --fix ya que es muy lento y puede bloquearse en contenedores
-            // console.log(`   [CLI] Sanando configuración (Doctor)...`);
-            // await execPromise(`${cli} doctor --fix --yes 2>&1 || true`);
-
-            // Intento de Binding Forzado (Probamos 'address' que es común en v2026)
-            // console.log(`   [CLI] Configurando modelo ${fullModel}...`);
-            // await execPromise(`${cli} config set agents.defaults.model ${fullModel} 2>&1`).catch(() => {});
-
-            // La API Key ya se pasa por variable de entorno (OPENAI_API_KEY) en docker-compose,
-            // no es necesario el comando 'auth add' que ha cambiado en esta versión.
-
-            for (const dept of departments) {
-                const role = dept.role.toLowerCase();
-                console.log(`   [CLI] Registrando sub-agente: ${role}...`);
-                // Intentamos la sintaxis moderna: agents add [role] [path]
-                // Si falla, al menos no detiene el proceso principal
-                await execPromise(`${cli} agents add ${role} agents/${role} --force 2>&1 || ${cli} agents add ${role} --force 2>&1`).catch(() => {});
-            }
         } catch (e: any) {
             console.warn(`⚠️ Error detallado en CLI: ${e.stdout || e.message}`);
         }
@@ -537,7 +521,7 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
             success: true,
             companyId,
             token: gatewayToken,
-            url: `http://${process.env.PUBLIC_IP || 'localhost'}:${ceoExternalPort}/#token=${gatewayToken}`
+            url: `http://${publicIp}:${ceoExternalPort}/#token=${gatewayToken}`
         });
 
     } catch (error: any) {
