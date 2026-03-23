@@ -6,7 +6,7 @@ export const generateCompanyCompose = (companyId: string, agents: any[]): string
     
     // Asignamos recursos robustos para una instancia que manejará múltiples sub-agentes
     // Optimización de recursos para evitar Swap Thrashing en VPS de 8GB
-    const memLimit = '1280m'; // 1.25GB de RAM (Suficiente para Node + sub-agentes ligeros)
+    const memLimit = '2048m'; // 2GB de RAM (Suficiente para Node + sub-agentes ligeros)
     const cpuLimit = '1.2';
 
     return `services:
