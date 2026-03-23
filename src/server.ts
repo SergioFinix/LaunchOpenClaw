@@ -318,7 +318,7 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
         channels: {
             telegram: {
                 enabled: !!telegramToken,
-                token: telegramToken
+                botToken: telegramToken
             }
         },
         agents: {
