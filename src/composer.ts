@@ -17,7 +17,7 @@ export const generateCompanyCompose = (companyId: string, agents: any[]): string
     init: true
     ports:
       - "\${OPENCLAW_GATEWAY_PORT_HOST:-${ceo.port}}:18889"
-    command: ["/bin/sh", "-c", "node /root/.openclaw/proxy.js & node openclaw.mjs gateway --allow-unconfigured"]
+    command: ["/bin/sh", "-c", "node /root/.openclaw/proxy.js & docker-entrypoint.sh node openclaw.mjs gateway --allow-unconfigured"]
     environment:
       - "NODE_OPTIONS=--max-old-space-size=2048"
       - "OPENCLAW_MODE=local"
