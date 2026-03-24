@@ -239,7 +239,7 @@ export default function AgentLauncher() {
               disabled={loading}
               className={cn(
                 "w-full py-5 rounded-xl font-bold uppercase tracking-widest transition-all relative overflow-hidden flex items-center justify-center gap-4",
-                loading ? "bg-slate-800 text-slate-500 cursor-not-allowed" : "bg-cyber-cyan text-slate-950 hover:bg-white hover:neon-cyan-glow"
+                loading ? "bg-slate-800 text-slate-500 cursor-not-allowed" : "bg-cyber-orange text-slate-950 hover:bg-white hover:neon-orange-glow"
               )}
             >
               {loading ? (
