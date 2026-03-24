@@ -19,7 +19,7 @@ export const generateCompanyCompose = (companyId: string, agents: any[]): string
       - "\${OPENCLAW_GATEWAY_PORT_HOST:-${ceo.port}}:18789"
     command: ["node", "openclaw.mjs", "gateway", "--allow-unconfigured"]
     environment:
-      - "NODE_OPTIONS=--max-old-space-size=1024"
+      - "NODE_OPTIONS=--max-old-space-size=2048"
       - "OPENCLAW_MODE=local"
       - "OPENCLAW_GATEWAY_MODE=local"
       - "OPENCLAW_GATEWAY_PORT=18789"
@@ -35,7 +35,9 @@ export const generateCompanyCompose = (companyId: string, agents: any[]): string
       - "PUBLIC_IP=\${PUBLIC_IP:-localhost}"
     volumes:
       - ./:/root/.openclaw
+      - ./:/app/.openclaw
       - ./workspace:/root/.openclaw/workspace
+      - ./workspace:/app/.openclaw/workspace
     deploy:
       resources:
         limits:
