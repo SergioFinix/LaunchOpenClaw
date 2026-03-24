@@ -1,12 +1,34 @@
 import { AgentConfig } from './server';
+import * as fs from 'fs/promises'; // Added fs import
 
-export const generateCompanyCompose = (companyId: string, agents: any[]): string => {
+export const generateCompanyCompose = async (companyId: string, agents: any[]): Promise<string> => { // Made function async
     // Tomamos la configuración del CEO (siempre el primero) para los puertos y tokens globales
     const ceo = agents.find(a => a.role === 'ceo') || agents[0];
     
     // Asignamos recursos robustos para una instancia que manejará múltiples sub-agentes
     const memLimit = '4096m'; // 4GB de RAM (Hardening contra picos de sub-agentes)
     const cpuLimit = '1.5';
+
+    // Proxy code to silence startup errors
+    const proxyCode = `const net = require('net');
+const server = net.createServer((clientSocket) => {
+    const targetSocket = net.connect(18789, '127.0.0.1', () => {
+        clientSocket.pipe(targetSocket);
+        targetSocket.pipe(clientSocket);
+    });
+    targetSocket.on('error', (err) => {
+        // Silencio durante el arranque...
+        clientSocket.destroy();
+    });
+    clientSocket.on('error', (err) => {
+        targetSocket.destroy();
+    });
+});
+server.listen(18889, '0.0.0.0', () => {
+    console.log('[Master Proxy] Puente 18889 -> 18789 Interno Activo');
+});`;
+    const proxyPath = './proxy.js'; // Define proxyPath
+    await fs.writeFile(proxyPath, proxyCode); // Write proxy code to file
 
     return `services:
   main:

@@ -416,7 +416,7 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         // Forzamos el uso de la llave del .env del Maestro para simplificar el CURL
         const masterApiKey = process.env.OPENAI_API_KEY;
         const ceoWithMetadata = { ...mainAgent, role: 'ceo', port, telegramToken, apiKey: masterApiKey };
-        const composeYaml = generateCompanyCompose(companyId, [ceoWithMetadata]);
+        const composeYaml = await generateCompanyCompose(companyId, [ceoWithMetadata]);
         await fs.writeFile(path.join(companyBaseDir, 'docker-compose.yml'), composeYaml);
 
         // 4. LANZAR INSTANCIA (PHASE 2)
