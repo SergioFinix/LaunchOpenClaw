@@ -1,4 +1,6 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
   --background: #020617; /* Slate 950 extreme dark */
@@ -7,17 +9,8 @@
   --cyber-pink: #f472b6;
   --cyber-orange: #ff9d00;
   --cyber-blue: #3b82f6;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-cyber-cyan: var(--cyber-cyan);
-  --color-cyber-pink: var(--cyber-pink);
-  --color-cyber-orange: var(--cyber-orange);
-  --color-cyber-blue: var(--cyber-blue);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-geist-sans: 'Inter', sans-serif;
+  --font-geist-mono: monospace;
 }
 
 body {
