@@ -17,7 +17,7 @@ export const generateCompanyCompose = (companyId: string, agents: any[]): string
     init: true
     ports:
       - "\${OPENCLAW_GATEWAY_PORT_HOST:-${ceo.port}}:18789"
-    command: ["node", "openclaw.mjs", "gateway", "--host", "0.0.0.0", "--allow-unconfigured"]
+    command: ["node", "openclaw.mjs", "gateway", "--allow-unconfigured"]
     environment:
       - "NODE_OPTIONS=--max-old-space-size=2048"
       - "OPENCLAW_MODE=local"
