@@ -302,26 +302,6 @@ ${agent.soul ? `\nInstrucciones adicionales de personalidad: ${agent.soul}` : 'A
  */
 async function setupInitialConfig(companyDir: string, token: string, model: string, port: number, telegramToken: string = '', departments: any[] = []) {
     const configPath = path.join(companyDir, 'openclaw.json');
-    const proxyPath = path.join(companyDir, 'proxy.js');
-    const proxyCode = `const net = require('net');
-const server = net.createServer((socket) => {
-    const client = net.connect(18789, '127.0.0.1', () => {
-        socket.pipe(client);
-        client.pipe(socket);
-    });
-    client.on('error', (err) => {
-        console.log('[Proxy Error]', err.message);
-        socket.destroy();
-    });
-    socket.on('error', (err) => {
-        console.log('[Socket Error]', err.message);
-        client.destroy();
-    });
-});
-console.log('[Master Proxy] Puente 18889 -> 18789 Activo');
-server.listen(18889, '0.0.0.0');`;
-    await fs.writeFile(proxyPath, proxyCode);
-
     // 1. GENERAR CONFIGURACIÓN (PHASE 7.0)
 
     const initialConfig: any = {
@@ -416,7 +396,7 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         // Forzamos el uso de la llave del .env del Maestro para simplificar el CURL
         const masterApiKey = process.env.OPENAI_API_KEY;
         const ceoWithMetadata = { ...mainAgent, role: 'ceo', port, telegramToken, apiKey: masterApiKey };
-        const composeYaml = await generateCompanyCompose(companyId, [ceoWithMetadata]);
+        const composeYaml = await generateCompanyCompose(companyId, companyBaseDir, [ceoWithMetadata]);
         await fs.writeFile(path.join(companyBaseDir, 'docker-compose.yml'), composeYaml);
 
         // 4. LANZAR INSTANCIA (PHASE 2)
@@ -439,52 +419,32 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
             throw e; // Relanzar para que el API responda error 500
         }
 
-        // 5. CONFIGURACIÓN Y ESPERA DE TOKEN (SYNC)
-        console.log(`⏳ Esperando inicialización de ${containerName}...`);
-
-        const cli = `docker exec -e OPENCLAW_GATEWAY_TOKEN=${gatewayToken} ${containerName} node openclaw.mjs`;
-
-        let initialized = false;
-        console.log(`   [Link] Paso 1: Sondeo de binario (60 reintentos)...`);
-        for (let i = 0; i < 60; i++) {
+        // 5. SONDEO DE PRECISIÓN (READINESS CHECK)
+        console.log(`⏳ Esperando a que el motor de ${containerName} despierte (Sondeo interno)...`);
+        
+        let ready = false;
+        // Bucle de 45 intentos (aprox 90 seg total)
+        for (let i = 0; i < 45; i++) {
             await new Promise(r => setTimeout(r, 2000));
             try {
-                await execPromise(`${cli} --version`);
-                initialized = true;
-                console.log(`   ✅ Binario detectado.`);
+                // Probamos la conexión TCP directamente al puerto 18789 desde dentro del contenedor
+                // Esto garantiza que el motor está escuchando y listo para el Proxy
+                await execPromise(`docker exec ${containerName} node -e "const net=require('net'); const s=net.connect(18789,'127.0.0.1',()=>process.exit(0)); s.on('error',()=>process.exit(1)); setTimeout(()=>process.exit(1),1000);"`);
+                ready = true;
+                console.log(`   🚀 ¡Motor de ${companyId} detectado y escuchando!`);
                 break;
-            } catch (e: any) {
-                if (i % 5 === 0) console.log(`   [Link] Intento ${i + 1}/60: Esperando a OpenClaw...`);
-            }
-        }
-
-        if (!initialized) {
-            console.warn("⚠️ Tiempo de espera de binario agotado.");
-        }
-
-        // 5.5 VERIFICACIÓN DE RESPUESTA HTTP (PROOF OF LIFE)...
-        let ready = false;
-        if (initialized) {
-            console.log(`   [Link] Paso 2: Verificando respuesta HTTP en puerto ${port}...`);
-            // Usamos un timeout total de 120s adicionales para el puerto (Total 4 min standby)
-            for (let j = 0; j < 60; j++) {
-                try {
-                    // Consultamos el puerto local del host
-                    const { stdout: curlOut } = await execPromise(`curl -I http://localhost:${port}`);
-                    if (curlOut.includes("200 OK") || curlOut.includes("101 Switching Protocols") || curlOut.includes("HTTP/")) {
-                        ready = true;
-                        console.log(`   🚀 ¡Dashboard Activo y Respondiendo!`);
-                        // Un pequeño margen de 3s para asegurar que los WebSockets internos estén bindeados
-                        await new Promise(r => setTimeout(r, 3000));
-                        break;
-                    }
-                } catch (e) { }
-                await new Promise(r => setTimeout(r, 2000));
+            } catch (e) {
+                if (i % 5 === 0) console.log(`   [Probing] Intento ${i + 1}/45: Motor aún calentando...`);
             }
         }
 
         if (!ready) {
-            console.warn("⚠️ El dashboard no respondió a tiempo, el link podría tardar unos segundos más.");
+            console.error(`❌ El motor de ${companyId} no despertó tras 90 segundos.`);
+            return res.status(503).json({ 
+                success: false, 
+                error: "El motor está tardando demasiado en iniciar. Por favor, intenta acceder en unos segundos.",
+                url: `http://${publicIp}:${port}/#token=${gatewayToken}`
+            });
         }
 
         // 6. PASOS FINALES DE CONFIGURACIÓN

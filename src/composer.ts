@@ -1,7 +1,8 @@
 import { AgentConfig } from './server';
-import * as fs from 'fs/promises'; // Added fs import
+import * as fs from 'fs/promises'; 
+import * as path from 'path'; // Added path import
 
-export const generateCompanyCompose = async (companyId: string, agents: any[]): Promise<string> => { // Made function async
+export const generateCompanyCompose = async (companyId: string, companyBaseDir: string, agents: any[]): Promise<string> => { 
     // Tomamos la configuración del CEO (siempre el primero) para los puertos y tokens globales
     const ceo = agents.find(a => a.role === 'ceo') || agents[0];
     
@@ -27,8 +28,8 @@ const server = net.createServer((clientSocket) => {
 server.listen(18889, '0.0.0.0', () => {
     console.log('[Master Proxy] Puente 18889 -> 18789 Interno Activo');
 });`;
-    const proxyPath = './proxy.js'; // Define proxyPath
-    await fs.writeFile(proxyPath, proxyCode); // Write proxy code to file
+    const proxyPath = path.join(companyBaseDir, 'proxy.js'); 
+    await fs.writeFile(proxyPath, proxyCode);
 
     return `services:
   main:
