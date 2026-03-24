@@ -17,13 +17,10 @@ export const generateCompanyCompose = (companyId: string, agents: any[]): string
     init: true
     ports:
       - "\${OPENCLAW_GATEWAY_PORT_HOST:-${ceo.port}}:18789"
-    command: ["node", "openclaw.mjs", "gateway", "--allow-unconfigured"]
     environment:
       - "NODE_OPTIONS=--max-old-space-size=2048"
       - "OPENCLAW_MODE=local"
       - "OPENCLAW_GATEWAY_MODE=local"
-      - "OPENCLAW_GATEWAY_HOST=0.0.0.0"
-      - "OPENCLAW_GATEWAY_PORT=18789"
       - "PORT=18789"
       - "OPENCLAW_AGENTS_DEFAULTS_MODEL=openai/gpt-4o"
       - "OPENAI_API_KEY=${ceo.apiKey || ''}"
