@@ -302,8 +302,27 @@ ${agent.soul ? `\nInstrucciones adicionales de personalidad: ${agent.soul}` : 'A
  */
 async function setupInitialConfig(companyDir: string, token: string, model: string, port: number, telegramToken: string = '', departments: any[] = []) {
     const configPath = path.join(companyDir, 'openclaw.json');
+    const proxyPath = path.join(companyDir, 'proxy.js');
+    const proxyCode = `const net = require('net');
+const server = net.createServer((socket) => {
+    const client = net.connect(18789, '127.0.0.1', () => {
+        socket.pipe(client);
+        client.pipe(socket);
+    });
+    client.on('error', (err) => {
+        console.log('[Proxy Error]', err.message);
+        socket.destroy();
+    });
+    socket.on('error', (err) => {
+        console.log('[Socket Error]', err.message);
+        client.destroy();
+    });
+});
+console.log('[Master Proxy] Puente 18889 -> 18789 Activo');
+server.listen(18889, '0.0.0.0');`;
+    await fs.writeFile(proxyPath, proxyCode);
+
     // 1. GENERAR CONFIGURACIÓN (PHASE 7.0)
-    // No proxy needed, we use direct mapping
 
     const initialConfig: any = {
         gateway: {
