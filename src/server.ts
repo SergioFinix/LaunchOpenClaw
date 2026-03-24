@@ -324,6 +324,7 @@ server.listen(18889, '0.0.0.0');`;
     const initialConfig: any = {
         gateway: {
             mode: "local",
+            address: "0.0.0.0",
             port: 18789, // Interno
             auth: {
                 token: token
