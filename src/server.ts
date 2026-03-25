@@ -125,45 +125,7 @@ app.post('/api/agents', async (req: Request, res: Response): Promise<any> => {
         }
 
         // 2. Lanzar Auto-Aprobación en segundo plano (2 minutos de cortesía)
-        const startAutoApprove = (uid: string) => {
-            let attempts = 0;
-            const interval = setInterval(async () => {
-                attempts++;
-                if (attempts > 120) return clearInterval(interval); // Parar tras 10min (120 * 5s)
-
-                try {
-                    // 1. Auto-aprobar dispositivos de Navegador (Web)
-                    // Usamos un heap pequeño (256MB) y un timeout de 10s para no colgar el loop
-                    const listCmd = `docker exec -e NODE_OPTIONS="--max-old-space-size=1024" openclaw-agent-${uid} openclaw devices list --json`;
-                    const { stdout: listOut } = await (execPromise(listCmd, { timeout: 10000 }) as any);
-                    const devices = JSON.parse(listOut);
-
-                    for (const dev of (devices.pending || [])) {
-                        console.log(`Auto-aprobando dispositivo para ${uid}: ${dev.requestId}`);
-                        await (execPromise(`docker exec -e NODE_OPTIONS="--max-old-space-size=1024" openclaw-agent-${uid} openclaw devices approve ${dev.requestId}`, { timeout: 10000 }) as any);
-                    }
-
-                    // 2. Auto-aprobar vinculaciones de Telegram
-                    const tgListCmd = `docker exec -e NODE_OPTIONS="--max-old-space-size=1024" openclaw-agent-${uid} openclaw pairing list telegram --json`;
-                    const { stdout: tgListOut } = await (execPromise(tgListCmd, { timeout: 10000 }) as any);
-                    const tgRequests = JSON.parse(tgListOut);
-
-                    for (const req of (tgRequests.requests || [])) {
-                        console.log(`Auto-aprobando Telegram para ${uid}: Code ${req.code}`);
-                        await (execPromise(`docker exec -e NODE_OPTIONS="--max-old-space-size=1024" openclaw-agent-${uid} openclaw pairing approve telegram ${req.code}`, { timeout: 10000 }) as any);
-                    }
-                } catch (e: any) {
-                    // Ignorar errores durante los primeros 60 segundos (Fase de arranque/onboard)
-                    if (attempts > 4) {
-                        if (!e.message.includes("No such container") && !e.message.includes("ETIMEDOUT")) {
-                            console.warn(`[AutoApprove ${uid}] Esperando que el binario esté listo...`);
-                        }
-                    }
-                }
-            }, 15000);
-        };
-
-        startAutoApprove(userId);
+        // startAutoApprove(userId); // REMOVED: Using allowFrom in newer versions
 
         // 5. Retornar éxito con URL completa (con token)
         const publicIp = process.env.PUBLIC_IP || 'localhost';
@@ -321,7 +283,8 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
             telegram: {
                 enabled: !!telegramToken,
                 botToken: telegramToken,
-                adminIds: [process.env.TELEGRAM_ADMIN_ID || '722123153']
+                dmPolicy: "allowlist",
+                allowFrom: [process.env.TELEGRAM_ADMIN_ID || '722123153']
             }
         },
         agents: {
@@ -471,43 +434,12 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
 
         // --- BACKGROUND AUTO-APROBACIÓN DE TELEGRAM (Enterprise) ---
         // Se ejecuta sin bloquear el Thread principal durante los primeros 15 minutos
-        const startEnterpriseAutoApprove = (compId: string) => {
-            let attempts = 0;
-            const container = `oc-${compId.toLowerCase()}`;
-
-            const poll = async () => {
-                attempts++;
-                if (attempts > 180) return; // Detener tras 15 minutos
-
-                try {
-                    // Verificamos si el contenedor existe y está corriendo antes de lanzar el comando pesado
-                    const { stdout: checkRunning } = await execPromise(`docker ps -q --filter name=${container}`);
-                    if (!checkRunning.trim()) {
-                        setTimeout(poll, 5000); // Reintentar en 5s si aún no arranca
-                        return;
-                    }
-
-                    const tgListCmd = `docker exec -e TELEGRAM_BOT_TOKEN=${telegramToken} -e NODE_OPTIONS="--max-old-space-size=512" ${container} openclaw pairing list telegram --json`;
-                    const { stdout: tgListOut } = await (execPromise(tgListCmd, { timeout: 15000 }) as any);
-                    const tgRequests = JSON.parse(tgListOut);
-
-                    for (const req of (tgRequests.requests || [])) {
-                        console.log(`[AutoApprove] Autenticando Telegram Empresarial para ${compId}: Code ${req.code}`);
-                        await (execPromise(`docker exec -e TELEGRAM_BOT_TOKEN=${telegramToken} -e NODE_OPTIONS="--max-old-space-size=512" ${container} openclaw pairing approve telegram ${req.code}`, { timeout: 15000 }) as any);
-                    }
-                } catch (e: any) {
-                    // Ignorar errores silenciosamente mientras el binario arranca o si hay timeout
-                }
-                // PROGRAMAR EL SIGUIENTE POLL SOLO DESPUÉS DE QUE ESTE TERMINE COMPLETAMENTE
-                setTimeout(poll, 5000);
-            };
-
-            poll();
-        };
-
+        /* 
+        // REMOVED: Legacy Auto-Approve loop. Now using dmPolicy: "allowlist"
         if (telegramToken && telegramToken.trim() !== '') {
             startEnterpriseAutoApprove(companyId);
         }
+        */
 
         res.status(200).json({
             success: true,
@@ -526,47 +458,10 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
  * GLOBAL WATCHER: Escanea TODOS los contenedores activos oc-* en busca de peticiones de Telegram.
  * Esto asegura que la auto-aprobación sobreviva a reinicios del Maestro.
  */
-async function startGlobalTelegramWatcher() {
-    console.log("ðŸ‘ ï¸  Iniciando Vigilante Global de Telegram (Inmortal)...");
-
-    const runCycle = async () => {
-        try {
-            // Listar contenedores que empiezan por oc- y están corriendo
-            const { stdout: containersList } = await execPromise(`docker ps --format "{{.Names}}" --filter "name=oc-"`);
-            const containers = containersList.split('\n').filter(name => name.trim().startsWith('oc-'));
-
-            for (const container of containers) {
-                try {
-                    // Obtener el Token del entorno del contenedor
-                    const { stdout: envOut } = await execPromise(`docker exec ${container} env | grep TELEGRAM_BOT_TOKEN`);
-                    const tokenMatch = envOut.match(/TELEGRAM_BOT_TOKEN=(.+)/);
-                    if (!tokenMatch) continue;
-                    const botToken = tokenMatch[1].trim();
-
-                    // Consultar emparejamientos pendientes
-                    const { stdout: tgListOut = "" } = await (execPromise(`docker exec -e TELEGRAM_BOT_TOKEN=${botToken} -e NODE_OPTIONS="--max-old-space-size=256" ${container} openclaw pairing list telegram --json`, { timeout: 10000 }) as any);
-                    const tgRequests = JSON.parse(tgListOut);
-
-                    for (const req of (tgRequests.requests || [])) {
-                        console.log(`[GlobalWatch] Auto-Aprobando para ${container}: ${req.code} (@${req.meta?.username})`);
-                        await execPromise(`docker exec -e TELEGRAM_BOT_TOKEN=${botToken} -e NODE_OPTIONS="--max-old-space-size=256" ${container} openclaw pairing approve telegram ${req.code}`);
-                    }
-                } catch (e) {
-                    // Error en un contenedor específico, continuar con el siguiente
-                }
-            }
-        } catch (e) {
-            console.error("[GlobalWatch] Error en ciclo de vigilancia:", e);
-        }
-
-        setTimeout(runCycle, 20000); // Escanear todo el cluster cada 20 segundos
-    };
-
-    runCycle();
-}
+// startGlobalTelegramWatcher(); // REMOVED: Using allowFrom in newer versions
 
 const PORT = Number(process.env.PORT) || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`ðŸš€ Master Server corriendo en http://0.0.0.0:${PORT}`);
-    startGlobalTelegramWatcher();
+    // startGlobalTelegramWatcher();
 });
