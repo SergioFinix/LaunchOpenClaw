@@ -301,6 +301,7 @@ Tu objetivo es ejecutar las tareas asignadas por el CEO con la máxima precisió
 async function setupInitialConfig(companyDir: string, token: string, model: string, port: number, telegramToken: string = '', departments: any[] = []) {
     const configPath = path.join(companyDir, 'openclaw.json');
     // 1. GENERAR CONFIGURACIÓN (PHASE 7.0)
+    const allAgentIds = ["main", ...departments.map(d => d.role.toLowerCase())];
 
     const initialConfig: any = {
         gateway: {
@@ -325,20 +326,53 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
         },
         agents: {
             defaults: {
-                model: model.includes('/') ? model : `openai/${model}`
+                model: model.includes('/') ? model : `openai/${model}`,
+                subagents: {
+                    model: "claude-haiku-4-5-20251001", // Modelo sugerido por el usuario
+                    maxConcurrent: 4,
+                    runTimeoutSeconds: 900
+                }
             },
             list: [
-                ...departments.map(dept => ({
-                    id: dept.role.toLowerCase(),
-                    model: dept.model?.includes('/') ? dept.model : `openai/${dept.model || 'gpt-4o-mini'}`,
-                    workspace: `~/.openclaw/workspace-${dept.role.toLowerCase()}`
-                })),
                 {
                     id: "main",
                     model: model.includes('/') ? model : `openai/${model}`,
-                    workspace: "~/.openclaw/workspace"
-                }
-            ]
+                    workspace: "~/.openclaw/workspace",
+                    subagents: {
+                        allowAgents: ["*"]
+                    }
+                },
+                ...departments.map(dept => ({
+                    id: dept.role.toLowerCase(),
+                    model: dept.model?.includes('/') ? dept.model : `openai/${dept.model || 'gpt-4o-mini'}`,
+                    workspace: `~/.openclaw/workspace-${dept.role.toLowerCase()}`,
+                    subagents: {
+                        allowAgents: allAgentIds.filter(id => id !== dept.role.toLowerCase())
+                    }
+                }))
+            ],
+            maxConcurrent: 4,
+            subagents: {
+                maxConcurrent: 8,
+                maxSpawnDepth: 2,
+                maxChildrenPerAgent: 8,
+                runTimeoutSeconds: 900
+            }
+        },
+        tools: {
+            profile: "full",
+            sessions: {
+                visibility: "all"
+            },
+            agentToAgent: {
+                enabled: true,
+                allow: allAgentIds
+            }
+        },
+        session: {
+            agentToAgent: {
+                maxPingPongTurns: 5
+            }
         }
     };
     await fs.writeFile(configPath, JSON.stringify(initialConfig, null, 2));
