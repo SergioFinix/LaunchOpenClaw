@@ -419,24 +419,42 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
             throw e; // Relanzar para que el API responda error 500
         }
 
-        // 5. SONDEO INTELIGENTE BASADO EN LOGS (READINESS CHECK DEFINITIVO)
-        console.log(`⏳ Escaneando signos vitales del motor ${containerName}...`);
+        // 5. SONDEO EN TIEMPO REAL BASADO EN LOG STREAMING (READINESS CHECK SUPREMO)
+        console.log(`⏳ Escaneando signos vitales en tiempo real del motor ${containerName}...`);
         
         let ready = false;
-        // Bucle de 60 intentos solicitados (aprox 120 seg total)
-        for (let i = 0; i < 60; i++) {
-            await new Promise(r => setTimeout(r, 2000));
-            try {
-                // Leer los últimos logs del contenedor buscando el mensaje de "listening" del gateway
-                const { stdout: logs } = await execPromise(`docker logs --tail 30 ${containerName}`);
-                if (logs.includes("listening on ws://")) {
-                    ready = true;
-                    console.log(`   🚀 ¡Motor de ${companyId} detectado y escuchando!`);
-                    break;
-                }
-            } catch (e: any) {
-                // Silencio durante el arranque inicial de docker
-            }
+        try {
+            ready = await new Promise<boolean>((resolve) => {
+                const { spawn } = require('child_process');
+                // docker logs -f streamea los logs en tiempo real sin comer cpu
+                const logStream = spawn('docker', ['logs', '-f', containerName]);
+                
+                // Timeout absoluto de 120 segundos propuesto por el usuario
+                const timeout = setTimeout(() => {
+                    logStream.kill();
+                    resolve(false);
+                }, 120000);
+
+                const checkOutput = (data: Buffer) => {
+                    if (data.toString().includes("listening on ws://")) {
+                        clearTimeout(timeout);
+                        logStream.kill();
+                        resolve(true);
+                    }
+                };
+
+                // OpenClaw a veces imprime logs en canal error o stdout, escuchamos ambos
+                logStream.stdout.on('data', checkOutput);
+                logStream.stderr.on('data', checkOutput);
+
+                logStream.on('error', () => {
+                    clearTimeout(timeout);
+                    logStream.kill();
+                    resolve(false);
+                });
+            });
+        } catch (e) {
+            console.error("Error en el log stream:", e);
         }
 
         if (!ready) {
