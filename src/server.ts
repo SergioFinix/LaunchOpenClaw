@@ -222,40 +222,76 @@ app.post('/api/agents/approve', async (req: Request, res: Response): Promise<any
 });
 
 // --- PHASE 3: DNA INJECTION HELPERS ---
-async function injectAgentContext(agentDir: string, companyId: string, role: string, businessPlan: string, agent: AgentConfig, isMaster: boolean = false) {
-    const workspaceDir = path.join(agentDir, 'workspace');
+async function injectAgentContext(workspaceDir: string, companyId: string, role: string, businessPlan: string, agent: AgentConfig, isMaster: boolean = false) {
     await fs.mkdir(workspaceDir, { recursive: true });
 
-    // 1. Inyectar ADN Empresarial (MEMORY.md)
-    const memoryContent = `# 🏢 Alineación Estratégica: ${companyId.toUpperCase()}
+    if (isMaster) {
+        // --- MAIN AGENT WORKSPACE ---
+        
+        // 1. IDENTITY.md (Nombre y Persona)
+        const identityContent = `# 🆔 Identidad del Agente
+Nombre: CEO ${companyId.toUpperCase()}
+Emoji: 🏢
+Avatar: default-ceo
+Descripción: Orquestador Maestro de ${companyId}
+`;
+        await fs.writeFile(path.join(workspaceDir, 'IDENTITY.md'), identityContent);
+
+        // 2. SOUL.md (Personalidad y Tono)
+        const soulContent = `# 🎭 Soul (Personalidad)
+Eres el CEO y Orquestador Maestro de la empresa ${companyId}. 
+Tu tono es ejecutivo, proactivo y estratégico. 
 Misión Global: ${businessPlan}
 
-# 🧬 Tu Rol en el Cluster
-Eres el agente especializado en: **${role.toUpperCase()}**.
-Prioridad de recursos: ${agent.priority || 'low'}.
-${isMaster ? '\nEres el CEO y Orquestador de este cluster empresarial.' : ''}
-
-Este documento guía tu comportamiento estratégico de largo plazo.
+## Instrucciones de Personalidad
+${agent.soul || 'Actúa con liderazgo y visión de negocio.'}
 `;
-    await fs.writeFile(path.join(workspaceDir, 'MEMORY.md'), memoryContent);
+        await fs.writeFile(path.join(workspaceDir, 'SOUL.md'), soulContent);
 
-    // 2. Inyectar Alma (SOUL.md)
-    // Inyectamos la capacidad de orquestación si es el CEO
-    const orchestrationPrompt = isMaster ? `
-## Orchestration Capabilities
-You are the Master Orchestrator (CEO). You have the native ability to manage sub-agents.
-To delegate tasks, use the sub-agents tools or the command: /subagents spawn [role] [task].
-You must coordinate with your departments to fulfill the company's objective.
-` : '';
+        // 3. AGENTS.md (Reglas Operativas)
+        const agentsContent = `# 📋 Instrucciones Operativas (SOPs)
+1. Eres responsable de coordinar a todos los sub-agentes del cluster.
+2. Utiliza las herramientas de delegación para asignar tareas a los departamentos.
+3. Mantén siempre el enfoque en cumplir la misión: ${businessPlan}.
 
-    const soulContent = `# 🎭 Identidad del Agente
-Rol: ${role}
+## Capacidades de Orquestación
+- Puedes spawnear sub-agentes usando: \`/subagents spawn [role] [task]\`.
+- Debes revisar el progreso de los departamentos periódicamente.
+`;
+        await fs.writeFile(path.join(workspaceDir, 'AGENTS.md'), agentsContent);
+
+        // 4. USER.md (Contexto del Usuario)
+        const userContent = `# 👤 Sobre el Usuario
+Este agente pertenece a la infraestructura privada de InstantStartup. 
+El usuario interactúa principalmente a través de la interfaz de Telegram o el Dashboard.
+`;
+        await fs.writeFile(path.join(workspaceDir, 'USER.md'), userContent);
+
+    } else {
+        // --- SUB-AGENT WORKSPACE ---
+
+        // 1. AGENTS.md (Instrucciones operativas específicas)
+        const agentsContent = `# 📋 Instrucciones Operativas - Especialidad: ${role.toUpperCase()}
 Empresa: ${companyId}
-${orchestrationPrompt}
-Propósito: Tu objetivo es servir a la misión de ${companyId} desde tu especialidad en ${role}. 
-${agent.soul ? `\nInstrucciones adicionales de personalidad: ${agent.soul}` : 'Actúa con profesionalismo y proactividad.'}
+Misión de la Empresa: ${businessPlan}
+
+## Tu Misión Específica
+Eres el agente especializado en **${role}**. 
+Tu objetivo es ejecutar las tareas asignadas por el CEO con la máxima precisión en tu área.
+
+## Reglas de Comportamiento
+- Ejecuta solo lo solicitado en tu área de expertiz.
+- Reporta resultados claros al CEO una vez finalizada la tarea.
 `;
-    await fs.writeFile(path.join(workspaceDir, 'SOUL.md'), soulContent);
+        await fs.writeFile(path.join(workspaceDir, 'AGENTS.md'), agentsContent);
+
+        // 2. TOOLS.md (Convenciones de herramientas)
+        const toolsContent = `# 🛠️ Convenciones de Herramientas
+- Utiliza las herramientas disponibles para completar tu tarea de ${role}.
+- Si necesitas recursos adicionales, solicítalos al CEO.
+`;
+        await fs.writeFile(path.join(workspaceDir, 'TOOLS.md'), toolsContent);
+    }
 }
 
 /**
@@ -294,11 +330,13 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
             list: [
                 ...departments.map(dept => ({
                     id: dept.role.toLowerCase(),
-                    model: dept.model?.includes('/') ? dept.model : `openai/${dept.model || 'gpt-4o-mini'}`
+                    model: dept.model?.includes('/') ? dept.model : `openai/${dept.model || 'gpt-4o-mini'}`,
+                    workspace: `~/.openclaw/workspace-${dept.role.toLowerCase()}`
                 })),
                 {
                     id: "main",
-                    model: model.includes('/') ? model : `openai/${model}`
+                    model: model.includes('/') ? model : `openai/${model}`,
+                    workspace: "~/.openclaw/workspace"
                 }
             ]
         }
@@ -332,20 +370,19 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         console.log(`🏗️  Creando Instancia Consolidada: ${companyId}...`);
 
         // 1. PREPARACIÓN DE DIRECTORIOS Y ADN (PHASE 3)
-        // El companyBaseDir ya mapea a /root/.openclaw dentro de Docker
-        await fs.mkdir(path.join(companyBaseDir, 'agents/main/agent'), { recursive: true });
+        // Main Agent Workspace
+        const mainWorkspaceDir = path.join(companyBaseDir, 'workspace');
+        await fs.mkdir(mainWorkspaceDir, { recursive: true });
+        await injectAgentContext(mainWorkspaceDir, companyId, 'ceo', plandeempresa, mainAgent, true);
 
-        // CEO Agent (Master)
-        await injectAgentContext(companyBaseDir, companyId, 'ceo', plandeempresa, mainAgent, true);
-
-        // Departamentos (Sub-folders internos en _agents para evitar auto-discovery recursivo)
+        // Departamentos (Sub-Workspaces)
         for (const dept of departments) {
             const role = dept.role.toLowerCase();
-            const deptDir = path.join(companyBaseDir, '_agents', role);
-            await fs.mkdir(path.join(deptDir, 'agent'), { recursive: true });
+            const deptWorkspaceDir = path.join(companyBaseDir, `workspace-${role}`);
+            await fs.mkdir(deptWorkspaceDir, { recursive: true });
 
-            console.log(`   [${role}] Inyectando ADN en sub-carpeta...`);
-            await injectAgentContext(deptDir, companyId, role, plandeempresa, dept);
+            console.log(`   [${role}] Inyectando ADN en sub-workspace...`);
+            await injectAgentContext(deptWorkspaceDir, companyId, role, plandeempresa, dept);
         }
 
         // 2. PRE-INYECCIÓN DE CONFIGURACIÓN (Garantiza acceso por Token al nacer)
