@@ -328,7 +328,7 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
             defaults: {
                 model: model.includes('/') ? model : `openai/${model}`,
                 subagents: {
-                    model: "claude-haiku-4-5-20251001", // Modelo sugerido por el usuario
+                    model: "openai/gpt-4o-mini", // Cambiado a OpenAI por solicitud del usuario
                     maxConcurrent: 4,
                     runTimeoutSeconds: 900
                 }
