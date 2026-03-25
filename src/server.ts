@@ -419,19 +419,33 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
             throw e; // Relanzar para que el API responda error 500
         }
 
-        // 5. SONDEO DE PRECISIÓN (READINESS CHECK)
-        // 5. ESPERA ESTÁTICA (El motor arranca en ~2 segundos)
-        console.log(`⏳ Dando 4 segundos de cortesía al motor de ${containerName}...`);
-        await new Promise(r => setTimeout(r, 4000));
-        console.log(`   🚀 ¡Tiempo de gracia finalizado! Motor listo.`);
+        // 5. SONDEO INTELIGENTE BASADO EN LOGS (READINESS CHECK DEFINITIVO)
+        console.log(`⏳ Escaneando signos vitales del motor ${containerName}...`);
+        
+        let ready = false;
+        // Bucle de 60 intentos solicitados (aprox 120 seg total)
+        for (let i = 0; i < 60; i++) {
+            await new Promise(r => setTimeout(r, 2000));
+            try {
+                // Leer los últimos logs del contenedor buscando el mensaje de "listening" del gateway
+                const { stdout: logs } = await execPromise(`docker logs --tail 30 ${containerName}`);
+                if (logs.includes("listening on ws://")) {
+                    ready = true;
+                    console.log(`   🚀 ¡Motor de ${companyId} detectado y escuchando!`);
+                    break;
+                }
+            } catch (e: any) {
+                // Silencio durante el arranque inicial de docker
+            }
+        }
 
-        // 6. PASOS FINALES DE CONFIGURACIÓN
-        try {
-            console.log(`   [Discovery] Verificando variables de entorno en contenedor...`);
-            const { stdout: containerEnv } = await execPromise(`docker exec ${containerName} env | grep -E "HOST|ADDRESS|MODE" || true`);
-            console.log(`   [Discovery Env]:\n${containerEnv}`);
-        } catch (e: any) {
-            console.warn(`⚠️ Error detallado en CLI: ${e.stdout || e.message}`);
+        if (!ready) {
+            console.error(`❌ El motor de ${companyId} no reportó estado "listening" en 120 segundos.`);
+            return res.status(503).json({ 
+                success: false, 
+                error: "El motor está tardando demasiado en iniciar. Por favor revisa los logs del contenedor.",
+                url: `http://${publicIp}:${port}/#token=${gatewayToken}`
+            });
         }
 
         const agentUrl = `http://${publicIp}:${port}/#token=${gatewayToken}`;
