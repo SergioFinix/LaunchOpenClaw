@@ -310,6 +310,7 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
             auth: {
                 token: token
             },
+            agentId: "main", // Agente por defecto para el Gateway
             controlUi: {
                 allowInsecureAuth: true,
                 dangerouslyDisableDeviceAuth: true,
@@ -321,7 +322,8 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
                 enabled: !!telegramToken,
                 botToken: telegramToken,
                 dmPolicy: "allowlist",
-                allowFrom: [process.env.TELEGRAM_ADMIN_ID || '722123153']
+                allowFrom: [process.env.TELEGRAM_ADMIN_ID || '722123153'],
+                agentId: "main" // El bot hablará con el CEO por defecto
             }
         },
         agents: {
