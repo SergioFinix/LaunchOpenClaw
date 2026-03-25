@@ -56,8 +56,8 @@ server.listen(18889, '0.0.0.0', () => {
       - "OPENCLAW_GATEWAY_TOKEN=${companyId}_master_token"
       - "PUBLIC_IP=\${PUBLIC_IP:-localhost}"
     volumes:
-      - ./:/root/.openclaw
-      - ./:/app/.openclaw
+      - "${path.join(companyBaseDir, 'proxy.js')}:/root/.openclaw/proxy.js:ro"
+      - "${path.join(companyBaseDir, 'openclaw.json')}:/root/.openclaw/openclaw.json:ro"
       - ./workspace:/root/.openclaw/workspace
       - ./workspace:/app/.openclaw/workspace
     deploy:
