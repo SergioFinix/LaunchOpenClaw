@@ -421,19 +421,19 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
 
         // 5. SONDEO EN TIEMPO REAL BASADO EN LOG STREAMING (READINESS CHECK SUPREMO)
         console.log(`⏳ Escaneando signos vitales en tiempo real del motor ${containerName}...`);
-        
+
         let ready = false;
         try {
             ready = await new Promise<boolean>((resolve) => {
                 const { spawn } = require('child_process');
                 // docker logs -f streamea los logs en tiempo real sin comer cpu
                 const logStream = spawn('docker', ['logs', '-f', containerName]);
-                
-                // Timeout absoluto de 120 segundos propuesto por el usuario
+
+                // Timeout absoluto de 480 segundos propuesto por el usuario (8 minutos)
                 const timeout = setTimeout(() => {
                     logStream.kill();
                     resolve(false);
-                }, 120000);
+                }, 480000);
 
                 const checkOutput = (data: Buffer) => {
                     if (data.toString().includes("listening on ws://")) {
@@ -459,8 +459,8 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
 
         if (!ready) {
             console.error(`❌ El motor de ${companyId} no reportó estado "listening" en 120 segundos.`);
-            return res.status(503).json({ 
-                success: false, 
+            return res.status(503).json({
+                success: false,
                 error: "El motor está tardando demasiado en iniciar. Por favor revisa los logs del contenedor.",
                 url: `http://${publicIp}:${port}/#token=${gatewayToken}`
             });
