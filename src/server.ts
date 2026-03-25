@@ -427,8 +427,9 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         for (let i = 0; i < 45; i++) {
             await new Promise(r => setTimeout(r, 2000));
             try {
-                // Probamos si el puerto TCP 18789 está escuchando (nc -z no depende del protocolo HTTP/WS)
-                await execPromise(`docker exec ${containerName} nc -z 127.0.0.1 18789`);
+                // Probamos la conexión HTTP al puerto 18789 usando wget interno
+                // Mucho más resistente a errores porque wget SÍ viene en la imagen
+                await execPromise(`docker exec ${containerName} wget -qO- http://127.0.0.1:18789/ > /dev/null`);
                 ready = true;
                 console.log(`   🚀 ¡Motor de ${companyId} detectado y escuchando!`);
                 break;
