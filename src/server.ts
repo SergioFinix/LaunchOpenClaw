@@ -310,7 +310,6 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
             auth: {
                 token: token
             },
-            agentId: "main", // Agente por defecto para el Gateway
             controlUi: {
                 allowInsecureAuth: true,
                 dangerouslyDisableDeviceAuth: true,
@@ -322,22 +321,25 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
                 enabled: !!telegramToken,
                 botToken: telegramToken,
                 dmPolicy: "allowlist",
-                allowFrom: [process.env.TELEGRAM_ADMIN_ID || '722123153'],
-                agentId: "main" // El bot hablará con el CEO por defecto
+                allowFrom: [process.env.TELEGRAM_ADMIN_ID || '722123153']
             }
         },
         agents: {
             defaults: {
                 model: model.includes('/') ? model : `openai/${model}`,
+                maxConcurrent: 4, // Global limit inside defaults
                 subagents: {
-                    model: "openai/gpt-4o-mini", // Cambiado a OpenAI por solicitud del usuario
-                    maxConcurrent: 4,
+                    model: "openai/gpt-4o-mini",
+                    maxConcurrent: 8,
+                    maxSpawnDepth: 2,
+                    maxChildrenPerAgent: 8,
                     runTimeoutSeconds: 900
                 }
             },
             list: [
                 {
                     id: "main",
+                    default: true, // Define este agente como el principal para la UI/Gateway
                     model: model.includes('/') ? model : `openai/${model}`,
                     workspace: "~/.openclaw/workspace",
                     subagents: {
@@ -352,15 +354,14 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
                         allowAgents: allAgentIds.filter(id => id !== dept.role.toLowerCase())
                     }
                 }))
-            ],
-            maxConcurrent: 4,
-            subagents: {
-                maxConcurrent: 8,
-                maxSpawnDepth: 2,
-                maxChildrenPerAgent: 8,
-                runTimeoutSeconds: 900
-            }
+            ]
         },
+        bindings: [
+            {
+                agentId: "main",
+                match: { channel: "telegram" }
+            }
+        ],
         tools: {
             profile: "full",
             sessions: {
