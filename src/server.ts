@@ -320,7 +320,8 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
         channels: {
             telegram: {
                 enabled: !!telegramToken,
-                botToken: telegramToken
+                botToken: telegramToken,
+                adminIds: [process.env.TELEGRAM_ADMIN_ID || '722123153']
             }
         },
         agents: {
