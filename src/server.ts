@@ -433,8 +433,8 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
                 ready = true;
                 console.log(`   🚀 ¡Motor de ${companyId} detectado y escuchando!`);
                 break;
-            } catch (e) {
-                if (i % 5 === 0) console.log(`   [Probing] Intento ${i + 1}/45: Motor aún calentando...`);
+            } catch (e: any) {
+                if (i % 5 === 0) console.log(`   [Probing] Intento ${i + 1}/45: Motor aún calentando... (${e.message || e})`);
             }
         }
 
