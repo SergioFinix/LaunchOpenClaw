@@ -64,7 +64,6 @@ server.listen(18889, '0.0.0.0', () => {
       resources:
         limits:
           memory: ${memLimit}
-          cpus: '${cpuLimit}'
           pids: 300
     restart: always
 `;
