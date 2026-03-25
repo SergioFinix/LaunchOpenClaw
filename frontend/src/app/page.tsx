@@ -36,6 +36,7 @@ export default function AgentLauncher() {
   const [businessPlan, setBusinessPlan] = useState("");
   const [mainAgentModel, setMainAgentModel] = useState("gpt-4o");
   const [telegramToken, setTelegramToken] = useState("");
+  const [telegramAdminId, setTelegramAdminId] = useState("");
   const [departments, setDepartments] = useState<{ name: string; model: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<null | { success: boolean; url?: string; error?: string }>(null);
@@ -67,6 +68,7 @@ export default function AgentLauncher() {
       const payload = {
         companyId: companyId.toLowerCase().replace(/\s+/g, '_'),
         telegramToken: telegramToken,
+        telegramAdminId: telegramAdminId,
         plandeempresa: businessPlan,
         mainAgent: { role: "ceo", model: mainAgentModel },
         departments: departments.map(d => ({ 
@@ -222,15 +224,27 @@ export default function AgentLauncher() {
             </div>
 
             {/* Telegram */}
-            <div className="space-y-2 pt-4">
-              <label className="text-xs font-bold uppercase tracking-widest text-cyber-cyan ml-1">Telegram Neural Link (Optional)</label>
-              <input
-                type="text"
-                value={telegramToken}
-                onChange={(e) => setTelegramToken(e.target.value)}
-                placeholder="Bot Token (BotFather)"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-cyber-cyan/50 font-mono"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-white/5">
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-cyber-cyan ml-1">Telegram Bot Token (Optional)</label>
+                <input
+                  type="text"
+                  value={telegramToken}
+                  onChange={(e) => setTelegramToken(e.target.value)}
+                  placeholder="Bot Token (BotFather)"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-cyber-cyan/50 font-mono"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-cyber-pink ml-1">Telegram User ID (Admin)</label>
+                <input
+                  type="text"
+                  value={telegramAdminId}
+                  onChange={(e) => setTelegramAdminId(e.target.value)}
+                  placeholder="ID (e.g. 722123153)"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-cyber-pink/50 font-mono"
+                />
+              </div>
             </div>
 
             {/* Submit */}
