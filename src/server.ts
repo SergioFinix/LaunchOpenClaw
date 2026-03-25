@@ -420,32 +420,10 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         }
 
         // 5. SONDEO DE PRECISIÓN (READINESS CHECK)
-        console.log(`⏳ Esperando a que el motor de ${containerName} despierte (Sondeo interno)...`);
-        
-        let ready = false;
-        // Bucle de 45 intentos (aprox 90 seg total)
-        for (let i = 0; i < 45; i++) {
-            await new Promise(r => setTimeout(r, 2000));
-            try {
-                // Probamos la conexión HTTP al puerto 18789 usando wget interno
-                // Mucho más resistente a errores porque wget SÍ viene en la imagen
-                await execPromise(`docker exec ${containerName} wget -qO- http://127.0.0.1:18789/ > /dev/null`);
-                ready = true;
-                console.log(`   🚀 ¡Motor de ${companyId} detectado y escuchando!`);
-                break;
-            } catch (e: any) {
-                if (i % 5 === 0) console.log(`   [Probing] Intento ${i + 1}/45: Motor aún calentando... (${e.message || e})`);
-            }
-        }
-
-        if (!ready) {
-            console.error(`❌ El motor de ${companyId} no despertó tras 90 segundos.`);
-            return res.status(503).json({ 
-                success: false, 
-                error: "El motor está tardando demasiado en iniciar. Por favor, intenta acceder en unos segundos.",
-                url: `http://${publicIp}:${port}/#token=${gatewayToken}`
-            });
-        }
+        // 5. ESPERA ESTÁTICA (El motor arranca en ~2 segundos)
+        console.log(`⏳ Dando 4 segundos de cortesía al motor de ${containerName}...`);
+        await new Promise(r => setTimeout(r, 4000));
+        console.log(`   🚀 ¡Tiempo de gracia finalizado! Motor listo.`);
 
         // 6. PASOS FINALES DE CONFIGURACIÓN
         try {
