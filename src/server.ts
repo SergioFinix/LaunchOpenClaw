@@ -27,7 +27,6 @@ export interface AgentConfig {
 interface CompanyRequest {
     companyId: string;
     telegramToken?: string;
-    telegramAdminId?: string;
     plandeempresa: string;
     mainAgent: AgentConfig; // The CEO
     departments: AgentConfig[];
@@ -301,7 +300,7 @@ ${agent.soul ? `\nInstrucciones adicionales de personalidad: ${agent.soul}` : 'A
  * NO creamos un config previo para evitar que el CLI muera por esquemas inválidos. 
  * El CLI creará uno nuevo válido al correr.
  */
-async function setupInitialConfig(companyDir: string, token: string, model: string, port: number, telegramToken: string = '', departments: any[] = [], telegramAdminId: string = '') {
+async function setupInitialConfig(companyDir: string, token: string, model: string, port: number, telegramToken: string = '', departments: any[] = []) {
     const configPath = path.join(companyDir, 'openclaw.json');
     // 1. GENERAR CONFIGURACIÓN (PHASE 7.0)
 
@@ -322,7 +321,7 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
             telegram: {
                 enabled: !!telegramToken,
                 botToken: telegramToken,
-                adminIds: [telegramAdminId || process.env.TELEGRAM_ADMIN_ID || '722123153']
+                adminIds: [process.env.TELEGRAM_ADMIN_ID || '722123153']
             }
         },
         agents: {
@@ -352,7 +351,7 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
 
 // --- PHASE 1: ENTERPRISE ORCHESTRATOR ---
 app.post('/api/companies', async (req: Request, res: Response): Promise<any> => {
-    const { companyId: rawId, telegramToken, telegramAdminId, plandeempresa, mainAgent, departments } = req.body as CompanyRequest;
+    const { companyId: rawId, telegramToken, plandeempresa, mainAgent, departments } = req.body as CompanyRequest;
     const companyId = (rawId || '').toLowerCase();
 
     // 1. Validar inputs básicos
@@ -389,7 +388,7 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         // 2. PRE-INYECCIÓN DE CONFIGURACIÓN (Garantiza acceso por Token al nacer)
         const port = await getFreePort(18890); // Rango superior para evitar colisiones
         const gatewayToken = `${companyId.toLowerCase()}_master_token`;
-        await setupInitialConfig(companyBaseDir, gatewayToken, mainAgent.model || "openai/gpt-4o", port, telegramToken, departments, telegramAdminId);
+        await setupInitialConfig(companyBaseDir, gatewayToken, mainAgent.model || "openai/gpt-4o", port, telegramToken, departments);
 
         // PARCHE DE PERMISOS FINAL
         try { await execPromise(`sudo chown -R 1000:1000 "${companyBaseDir}"`); } catch (e) { }
