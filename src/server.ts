@@ -428,9 +428,9 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         for (let i = 0; i < 45; i++) {
             await new Promise(r => setTimeout(r, 2000));
             try {
-                // Probamos la conexión TCP directamente al puerto 18789 desde dentro del contenedor
-                // Esto garantiza que el motor está escuchando y listo para el Proxy
-                await execPromise(`docker exec ${containerName} node -e "const net=require('net'); const s=net.connect(18789,'127.0.0.1',()=>process.exit(0)); s.on('error',()=>process.exit(1)); setTimeout(()=>process.exit(1),1000);"`);
+                // Probamos la conexión TCP directamente al puerto 18789
+                // Usamos un comando más robusto dentro del contenedor
+                await execPromise(`docker exec ${containerName} node -e "const net=require('net'); const s=net.connect(18789,'127.0.0.1'); s.on('connect',()=>process.exit(0)); s.on('error',()=>process.exit(1)); setTimeout(()=>process.exit(1),2000);"`);
                 ready = true;
                 console.log(`   🚀 ¡Motor de ${companyId} detectado y escuchando!`);
                 break;
