@@ -6,7 +6,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import dotenv from 'dotenv';
 
-// Cargar variables de entorno (ej. OPENAI_API_KEY)
+// Cargar variables de entorno (ej. OPENAI_API_KEY)...
 dotenv.config();
 
 import net from 'net';
