@@ -321,7 +321,7 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
                 enabled: !!telegramToken,
                 botToken: telegramToken,
                 dmPolicy: "allowlist",
-                allowFrom: [process.env.TELEGRAM_ADMIN_ID || '722123153']
+                allowFrom: [Number(process.env.TELEGRAM_ADMIN_ID || 722123153)] // CRITICAL: Numeric type for Engine
             }
         },
         agents: {
@@ -432,12 +432,13 @@ function startTelegramPairingWatcher(companyId: string, configPath: string) {
             try {
                 const raw = await fs.readFile(configPath, 'utf-8');
                 const config = JSON.parse(raw);
-                const allowFrom: string[] = config?.channels?.telegram?.allowFrom ?? [];
-                if (!allowFrom.includes(userId)) {
-                    allowFrom.push(userId);
+                const allowFrom: any[] = config?.channels?.telegram?.allowFrom ?? [];
+                const numericUserId = Number(userId);
+                if (!allowFrom.includes(numericUserId)) {
+                    allowFrom.push(numericUserId);
                     config.channels.telegram.allowFrom = allowFrom;
                     await fs.writeFile(configPath, JSON.stringify(config, null, 2));
-                    console.log(`✅ [Pairing Watcher] User ${userId} persistido en allowFrom de openclaw.json.`);
+                    console.log(`✅ [Pairing Watcher] User ${numericUserId} persistido en allowFrom de openclaw.json.`);
                 }
             } catch (e: any) {
                 console.warn(`⚠️  [Pairing Watcher] Error actualizando openclaw.json: ${e.message}`);
