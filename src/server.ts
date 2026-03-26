@@ -324,6 +324,9 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
                 allowFrom: [Number(process.env.TELEGRAM_ADMIN_ID || 722123153)] // CRITICAL: Numeric type for Engine
             }
         },
+        commands: {
+            text: true // Permite que el bot procese comandos de texto como /subagents spawn
+        },
         agents: {
             defaults: {
                 model: model.includes('/') ? model : `openai/${model}`,
@@ -365,11 +368,10 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
         tools: {
             profile: "full",
             sessions: {
-                visibility: "all"
+                visibility: "tree" // Optimizado para jerarquía Padre-Hijo sin conflictos
             },
             agentToAgent: {
-                enabled: true,
-                allow: allAgentIds
+                enabled: false // Desactivado para evitar el bug de bloqueo en spawning
             }
         },
         session: {
