@@ -387,6 +387,82 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
     } catch (e) { }
 }
 
+// --- TELEGRAM PAIRING AUTO-APPROVER ---
+function startTelegramPairingWatcher(companyId: string, configPath: string) {
+    const containerName = `oc-${companyId.toLowerCase()}`;
+    const { spawn } = require('child_process');
+
+    console.log(`👁️  [Pairing Watcher] Iniciando para ${companyId}...`);
+
+    const logStream = spawn('docker', ['logs', '-f', containerName]);
+
+    let pendingUserId = '';
+    let pendingPairingCode = '';
+
+    const processLine = async (line: string) => {
+        const userIdMatch = line.match(/Your Telegram user id:\s*(\d+)/);
+        if (userIdMatch) {
+            pendingUserId = userIdMatch[1];
+            console.log(`👁️  [Pairing Watcher] User ID detectado: ${pendingUserId}`);
+        }
+
+        const pairingMatch = line.match(/Pairing code:\s*([A-Z0-9]{4,12})/);
+        if (pairingMatch) {
+            pendingPairingCode = pairingMatch[1];
+            console.log(`👁️  [Pairing Watcher] Pairing code detectado: ${pendingPairingCode}`);
+        }
+
+        if (pendingUserId && pendingPairingCode) {
+            const userId = pendingUserId;
+            const code = pendingPairingCode;
+            pendingUserId = '';
+            pendingPairingCode = '';
+
+            console.log(`🤝 [Pairing Watcher] Auto-aprobando user ${userId} con code ${code}...`);
+
+            // 1. Aprobar el pairing dentro del contenedor (sin restart, ~1 seg)
+            try {
+                await execPromise(`docker exec ${containerName} openclaw pairing approve telegram ${code}`, { timeout: 10000 });
+                console.log(`✅ [Pairing Watcher] Pairing ${code} aprobado correctamente.`);
+            } catch (e: any) {
+                console.warn(`⚠️  [Pairing Watcher] Error en pairing approve: ${e.message}`);
+            }
+
+            // 2. Persistir en openclaw.json del host (para sobrevivir restarts futuros)
+            try {
+                const raw = await fs.readFile(configPath, 'utf-8');
+                const config = JSON.parse(raw);
+                const allowFrom: string[] = config?.channels?.telegram?.allowFrom ?? [];
+                if (!allowFrom.includes(userId)) {
+                    allowFrom.push(userId);
+                    config.channels.telegram.allowFrom = allowFrom;
+                    await fs.writeFile(configPath, JSON.stringify(config, null, 2));
+                    console.log(`✅ [Pairing Watcher] User ${userId} persistido en allowFrom de openclaw.json.`);
+                }
+            } catch (e: any) {
+                console.warn(`⚠️  [Pairing Watcher] Error actualizando openclaw.json: ${e.message}`);
+            }
+        }
+    };
+
+    let buffer = '';
+    const handleData = (data: Buffer) => {
+        buffer += data.toString();
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        lines.forEach(line => processLine(line));
+    };
+
+    logStream.stdout.on('data', handleData);
+    logStream.stderr.on('data', handleData);
+    logStream.on('error', (err: Error) => {
+        console.warn(`⚠️  [Pairing Watcher] Stream error para ${companyId}: ${err.message}`);
+    });
+    logStream.on('close', () => {
+        console.log(`👁️  [Pairing Watcher] Stream cerrado para ${companyId}.`);
+    });
+}
+
 // --- PHASE 1: ENTERPRISE ORCHESTRATOR ---
 app.post('/api/companies', async (req: Request, res: Response): Promise<any> => {
     const { companyId: rawId, telegramToken, plandeempresa, mainAgent, departments } = req.body as CompanyRequest;
@@ -506,14 +582,11 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
 
         const agentUrl = `http://${publicIp}:${port}/#token=${gatewayToken}`;
 
-        // --- BACKGROUND AUTO-APROBACIÓN DE TELEGRAM (Enterprise) ---
-        // Se ejecuta sin bloquear el Thread principal durante los primeros 15 minutos
-        /* 
-        // REMOVED: Legacy Auto-Approve loop. Now using dmPolicy: "allowlist"
+        // --- BACKGROUND TELEGRAM PAIRING WATCHER ---
         if (telegramToken && telegramToken.trim() !== '') {
-            startEnterpriseAutoApprove(companyId);
+            const configPath = path.join(companyBaseDir, 'openclaw.json');
+            startTelegramPairingWatcher(companyId, configPath);
         }
-        */
 
         res.status(200).json({
             success: true,
