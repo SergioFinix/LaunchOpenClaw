@@ -227,7 +227,7 @@ async function injectAgentContext(workspaceDir: string, companyId: string, role:
 
     if (isMaster) {
         // --- MAIN AGENT WORKSPACE ---
-        
+
         // 1. IDENTITY.md (Nombre y Persona)
         const identityContent = `# 🆔 Identidad del Agente
 Nombre: CEO ${companyId.toUpperCase()}
@@ -331,7 +331,7 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
             }
         },
         commands: {
-            text: true // Permite que el bot procese comandos de texto como /subagents spawn
+            text: true // Permite que el bot procese comandos de texto como /subagents spawn...
         },
         agents: {
             defaults: {
@@ -497,7 +497,7 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         const mainWorkspaceDir = path.join(companyBaseDir, 'workspace');
         // 1. INYECTAR ADN EN CADA WORKSPACE (PHASE 2)
         const allRoles = ["main", ...departments.map(d => d.role.toLowerCase())];
-        
+
         console.log(`🧬 Inyectando ADN en el CEO...`);
         await fs.mkdir(mainWorkspaceDir, { recursive: true }); // Ensure main workspace exists
         await injectAgentContext(mainWorkspaceDir, companyId, 'ceo', plandeempresa, mainAgent, allRoles, true);
