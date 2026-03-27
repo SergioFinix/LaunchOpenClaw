@@ -222,7 +222,7 @@ app.post('/api/agents/approve', async (req: Request, res: Response): Promise<any
 });
 
 // --- PHASE 3: DNA INJECTION HELPERS ---
-async function injectAgentContext(workspaceDir: string, companyId: string, role: string, businessPlan: string, agent: AgentConfig, isMaster: boolean = false) {
+async function injectAgentContext(workspaceDir: string, companyId: string, role: string, businessPlan: string, agent: AgentConfig, allRoles: string[] = [], isMaster: boolean = false) {
     await fs.mkdir(workspaceDir, { recursive: true });
 
     if (isMaster) {
@@ -248,14 +248,19 @@ ${agent.soul || 'Actúa con liderazgo y visión de negocio.'}
 `;
         await fs.writeFile(path.join(workspaceDir, 'SOUL.md'), soulContent);
 
-        // 3. AGENTS.md (Reglas Operativas)
-        const agentsContent = `# 📋 Instrucciones Operativas (SOPs)
-1. Eres responsable de coordinar a todos los sub-agentes del cluster.
-2. Utiliza las herramientas de delegación para asignar tareas a los departamentos.
+        // 3. AGENTS.md (Directorio de Equipo y SOPs)
+        const teamList = allRoles.filter(r => r.toLowerCase() !== 'ceo' && r.toLowerCase() !== 'main').map(r => `- **${r.toUpperCase()}**: Departamento especializado.`).join('\n');
+        const agentsContent = `# 📋 Directorio de Equipo y SOPs
+Tienes a tu disposición el siguiente equipo de agentes para delegar tareas:
+${teamList}
+
+## Instrucciones de Delegación
+1. Eres el responsable de coordinar a todos los sub-agentes del cluster.
+2. Utiliza la herramienta de sesiones parea asignar tareas: \`/subagents spawn [rol] "[tarea específica]" \`.
 3. Mantén siempre el enfoque en cumplir la misión: ${businessPlan}.
 
 ## Capacidades de Orquestación
-- Puedes spawnear sub-agentes usando: \`/subagents spawn [role] [task]\`.
+- Puedes spawnear sub-agentes usando el comando de texto o la herramienta interna.
 - Debes revisar el progreso de los departamentos periódicamente.
 `;
         await fs.writeFile(path.join(workspaceDir, 'AGENTS.md'), agentsContent);
@@ -371,8 +376,7 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
                 visibility: "tree"
             },
             agentToAgent: {
-                enabled: true,
-                allow: allAgentIds // Allow all agents within the enterprise cluster to communicate
+                enabled: false // Desactivado para evitar el bug de bloqueo; usamos subagents spawn jerárquico
             }
         },
         session: {
@@ -489,17 +493,19 @@ app.post('/api/companies', async (req: Request, res: Response): Promise<any> => 
         // 1. PREPARACIÓN DE DIRECTORIOS Y ADN (PHASE 3)
         // Main Agent Workspace
         const mainWorkspaceDir = path.join(companyBaseDir, 'workspace');
-        await fs.mkdir(mainWorkspaceDir, { recursive: true });
-        await injectAgentContext(mainWorkspaceDir, companyId, 'ceo', plandeempresa, mainAgent, true);
+        // 1. INYECTAR ADN EN CADA WORKSPACE (PHASE 2)
+        const allRoles = ["main", ...departments.map(d => d.role.toLowerCase())];
+        
+        console.log(`🧬 Inyectando ADN en el CEO...`);
+        await fs.mkdir(mainWorkspaceDir, { recursive: true }); // Ensure main workspace exists
+        await injectAgentContext(mainWorkspaceDir, companyId, 'ceo', plandeempresa, mainAgent, allRoles, true);
 
-        // Departamentos (Sub-Workspaces)
         for (const dept of departments) {
             const role = dept.role.toLowerCase();
             const deptWorkspaceDir = path.join(companyBaseDir, `workspace-${role}`);
-            await fs.mkdir(deptWorkspaceDir, { recursive: true });
-
+            await fs.mkdir(deptWorkspaceDir, { recursive: true }); // Ensure department workspace exists
             console.log(`   [${role}] Inyectando ADN en sub-workspace...`);
-            await injectAgentContext(deptWorkspaceDir, companyId, role, plandeempresa, dept);
+            await injectAgentContext(deptWorkspaceDir, companyId, role, plandeempresa, dept, allRoles, false);
         }
 
         // 2. PRE-INYECCIÓN DE CONFIGURACIÓN (Garantiza acceso por Token al nacer)
