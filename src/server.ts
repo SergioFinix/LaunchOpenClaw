@@ -254,19 +254,15 @@ ${agent.soul || 'Actúa con liderazgo y visión de negocio.'}
 Tienes a tu disposición el siguiente equipo de agentes para delegar tareas:
 ${teamList}
 
-## ⚠️ PROHIBICIÓN CRÍTICA
-- **NUNCA** intentes contactar a los sub-agentes por el canal de Telegram (ej. no uses @ventas).
-- Los departamentos NO son canales de chat; son procesos internos de tu cluster. No intentes enviarles mensajes directos por chat.
-- Si intentas usar Telegram para hablar con ellos, el sistema fallará porque no son canales de mensajería externa.
-
-## Instrucciones de Delegación
-1. Eres el responsable de coordinar a todos los sub-agentes del cluster.
-2. Utiliza la herramienta de sesiones **para** asignar tareas: \`/subagents spawn [rol] "[tarea específica]" \`.
-3. Mantén siempre el enfoque en cumplir la misión: ${businessPlan}.
+## Instrucciones de Comunicación (SOPs)
+1. **Delegación Hierárquica**: Usa \`/subagents spawn [rol] "[tarea]" \` para iniciar un nuevo departamento desde cero.
+2. **Mensajería Directa**: Si un departamento ya está activo en las sesiones, puedes usar la herramienta de mensajería para hablar con él directamente.
+3. **Visibilidad Total**: Tienes visibilidad de todos los agentes del cluster empresarial. No intentes usar Telegram para comunicación interna; utiliza los puentes de datos del sistema.
+4. Mantén siempre el enfoque en cumplir la misión: ${businessPlan}.
 
 ## Capacidades de Orquestación
-- Puedes spawnear sub-agentes usando el comando de texto o la herramienta interna \`sessions_spawn\`.
-- Debes revisar el progreso de los departamentos periódicamente.
+- Tienes acceso completo a la herramienta \`sessions_spawn\` y \`agent_message\`.
+- Debes coordinar al equipo para lograr los objetivos del plan de negocio.
 `;
         await fs.writeFile(path.join(workspaceDir, 'AGENTS.md'), agentsContent);
 
@@ -378,10 +374,11 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
         tools: {
             profile: "full",
             sessions: {
-                visibility: "tree"
+                visibility: "all" // Permite que los agentes se encuentren para enviarse mensajes directos
             },
             agentToAgent: {
-                enabled: false // Desactivado para evitar el bug de bloqueo; usamos subagents spawn jerárquico
+                enabled: true,
+                allow: allAgentIds // Habilita el puente de comunicación directa entre agentes
             }
         },
         session: {
