@@ -346,7 +346,7 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
                     model: model.includes('/') ? model : `openai/${model}`,
                     workspace: "~/.openclaw/workspace",
                     subagents: {
-                        allowAgents: ["*"]
+                        allowAgents: allAgentIds.filter(id => id !== "main") // Explicit list for maximum compatibility
                     }
                 },
                 ...departments.map(dept => ({
@@ -368,10 +368,11 @@ async function setupInitialConfig(companyDir: string, token: string, model: stri
         tools: {
             profile: "full",
             sessions: {
-                visibility: "tree" // Optimizado para jerarquía Padre-Hijo sin conflictos
+                visibility: "tree"
             },
             agentToAgent: {
-                enabled: false // Desactivado para evitar el bug de bloqueo en spawning
+                enabled: true,
+                allow: allAgentIds // Allow all agents within the enterprise cluster to communicate
             }
         },
         session: {
